@@ -79,14 +79,15 @@ export default defineConfig(({ command }) => {
   return {
     plugins: [react(), railwayDebugPlugin()],
     // When Railway runs `vite` (dev), PORT is set (e.g. 8080) but Vite defaulted to 5173 + localhost → edge 502.
+    // Use IPv4 explicitly: `host: true` listened on `::` only and Railway still returned GET / 502 in HTTP logs.
     server: {
-      host: true,
+      host: '0.0.0.0',
       port: parseInt(process.env.PORT || '5173', 10),
       strictPort: Boolean(process.env.PORT),
     },
     // Railway (and similar) set PORT and require listening on all interfaces.
     preview: {
-      host: true,
+      host: '0.0.0.0',
       port: parseInt(process.env.PORT || '4173', 10),
       strictPort: true,
     },
