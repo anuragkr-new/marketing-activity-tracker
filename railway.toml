@@ -1,5 +1,6 @@
 # One Railway service: Node serves /api/* and the built React app from client/dist.
 # Variables: DATABASE_URL (Postgres), VITE_ADMIN_PIN (at build time for client bundle).
+# Boot also runs db:setup when RAILWAY_ENVIRONMENT is set (no SSH needed).
 #
 # releaseCommand runs migrate + seed before each new release (idempotent).
 
