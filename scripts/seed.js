@@ -4,6 +4,30 @@ require('dotenv').config({ path: path.join(__dirname, '..', 'server', '.env') })
 const { pool } = require('../server/db/pool');
 const { allMondaysOverlappingYear } = require('../server/lib/isoWeek');
 
+const DEFAULT_THEMES = [
+  'Funnel Optimization',
+  'Paid Marketing / ABM',
+  'AEO',
+  'SEO and Content',
+  'Newsletter',
+  'Reporting',
+  'Trust Library',
+  'Objection Library',
+  'Dealer Campaigns',
+  'Product Campaigns',
+  'Event Campaigns',
+];
+
+async function ensureThemes() {
+  for (const name of DEFAULT_THEMES) {
+    await pool.query(
+      `INSERT INTO themes (name) VALUES ($1) ON CONFLICT (name) DO NOTHING`,
+      [name]
+    );
+  }
+  console.log(`Ensured ${DEFAULT_THEMES.length} default themes (skipped if name already exists).`);
+}
+
 async function ensureWeeks() {
   const y = new Date().getFullYear();
   const rows = allMondaysOverlappingYear(y);
@@ -20,6 +44,7 @@ async function ensureWeeks() {
 }
 
 async function main() {
+  await ensureThemes();
   await ensureWeeks();
   await pool.end();
 }
