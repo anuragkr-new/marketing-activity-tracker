@@ -1,5 +1,31 @@
 const K_LOG = 'spyne_at_debug_log';
 const K_ERR = 'spyne_at_last_login_error';
+const K_HOLD = 'spyne_at_login_hold';
+
+/** Prevents LoginRoute from redirecting away until user opens the dashboard. */
+export function setLoginHold() {
+  try {
+    sessionStorage.setItem(K_HOLD, '1');
+  } catch {
+    /* ignore */
+  }
+}
+
+export function clearLoginHold() {
+  try {
+    sessionStorage.removeItem(K_HOLD);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function hasLoginHold() {
+  try {
+    return sessionStorage.getItem(K_HOLD) === '1';
+  } catch {
+    return false;
+  }
+}
 
 /** Append NDJSON line + console; survives navigation for copy/paste. */
 export function agentDebugLog(location, message, data, hypothesisId) {

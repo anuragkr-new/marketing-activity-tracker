@@ -4,10 +4,13 @@ import RequireAuth from './components/RequireAuth.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
 import InitiativeDetailPage from './pages/InitiativeDetailPage.jsx';
+import { hasLoginHold } from './utils/agentDebug.js';
 
 function LoginRoute({ children }) {
   const { isAuthenticated } = useAuth();
-  if (isAuthenticated) return <Navigate to="/" replace />;
+  if (isAuthenticated && !hasLoginHold()) {
+    return <Navigate to="/" replace />;
+  }
   return children;
 }
 

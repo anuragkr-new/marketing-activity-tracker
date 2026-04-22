@@ -6,6 +6,7 @@ import React, {
   useState,
 } from 'react';
 import { apiRequest } from '../api/client';
+import { clearLoginHold, setLoginHold } from '../utils/agentDebug.js';
 
 const AuthContext = createContext(null);
 
@@ -25,6 +26,7 @@ export function AuthProvider({ children }) {
   });
 
   const logout = useCallback(() => {
+    clearLoginHold();
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
     setToken(null);
@@ -36,6 +38,8 @@ export function AuthProvider({ children }) {
       method: 'POST',
       body: { username, password },
     });
+    // Before auth state flips: keeps /login mounted so debug UI can run (LoginRoute).
+    setLoginHold();
     localStorage.setItem(TOKEN_KEY, data.token);
     localStorage.setItem(USER_KEY, JSON.stringify(data.user));
     setToken(data.token);

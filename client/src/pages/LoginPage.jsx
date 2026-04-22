@@ -4,24 +4,34 @@ import { useAuth } from '../contexts/AuthContext.jsx';
 import {
   agentDebugLog,
   clearLoginDebug,
+  clearLoginHold,
+  hasLoginHold,
   persistLoginError,
   readDebugLogLines,
   readLastLoginError,
 } from '../utils/agentDebug.js';
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, isAuthenticated } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [panelLines, setPanelLines] = useState(() => readDebugLogLines());
   const [persistedErr, setPersistedErr] = useState(() => readLastLoginError());
+  const [showContinue, setShowContinue] = useState(false);
 
   useEffect(() => {
     setPanelLines(readDebugLogLines());
     setPersistedErr(readLastLoginError());
   }, []);
+
+  useEffect(() => {
+    if (isAuthenticated && hasLoginHold()) {
+      setShowContinue(true);
+      setPanelLines(readDebugLogLines());
+    }
+  }, [isAuthenticated]);
 
   useEffect(() => {
     if (!loading) return undefined;
@@ -31,9 +41,35 @@ export default function LoginPage() {
     return () => clearInterval(id);
   }, [loading]);
 
+  async function copyDebug() {
+    const parts = [];
+    const err = readLastLoginError() || error;
+    if (err) parts.push(`Error: ${err}`);
+    parts.push(...readDebugLogLines());
+    const text = parts.join('\n\n') || '(no debug lines)';
+    try {
+      await navigator.clipboard.writeText(text);
+      agentDebugLog('LoginPage.jsx:copy', 'clipboard ok', { chars: text.length }, 'H8');
+    } catch (e) {
+      agentDebugLog(
+        'LoginPage.jsx:copy-fail',
+        'clipboard failed',
+        { message: String(e?.message || e) },
+        'H8'
+      );
+    }
+    setPanelLines(readDebugLogLines());
+  }
+
+  function goDashboard() {
+    clearLoginHold();
+    window.location.replace('/');
+  }
+
   async function onSubmit(e) {
     e.preventDefault();
     setError('');
+    setShowContinue(false);
     clearLoginDebug();
     setPanelLines([]);
     setPersistedErr('');
@@ -50,12 +86,13 @@ export default function LoginPage() {
       await login(username, password);
       agentDebugLog(
         'LoginPage.jsx:after-login',
-        'login resolved, navigating',
+        'login ok — use Continue when ready',
         {},
         'H6'
       );
-      clearLoginDebug();
-      window.location.replace('/');
+      setPanelLines(readDebugLogLines());
+      setShowContinue(true);
+      setLoading(false);
     } catch (err) {
       const msg = err.message || 'Sign in failed';
       agentDebugLog(
@@ -77,7 +114,7 @@ export default function LoginPage() {
   }
 
   const showPanel = Boolean(
-    loading || panelLines.length || persistedErr || error
+    loading || showContinue || panelLines.length || persistedErr || error
   );
 
   return (
@@ -102,6 +139,28 @@ export default function LoginPage() {
           <span style={{ color: 'var(--blue)' }}>Spyne</span>{' '}
           <span style={{ color: 'var(--ink)' }}>Activity Tracker</span>
         </h1>
+        {showContinue ? (
+          <div
+            style={{
+              padding: 16,
+              borderRadius: 8,
+              background: 'rgba(34, 139, 34, 0.12)',
+              marginBottom: 16,
+              fontSize: 13,
+            }}
+          >
+            <strong>Signed in.</strong> Copy the debug block below if you still need it, then open
+            the dashboard.
+            <div style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
+              <button type="button" className="btn-primary" onClick={copyDebug}>
+                Copy debug to clipboard
+              </button>
+              <button type="button" className="btn-primary" onClick={goDashboard}>
+                Open dashboard
+              </button>
+            </div>
+          </div>
+        ) : null}
         <form onSubmit={onSubmit}>
           <div style={{ marginBottom: 14 }}>
             <div className="eyebrow" style={{ marginBottom: 6 }}>
@@ -112,6 +171,7 @@ export default function LoginPage() {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               autoComplete="username"
+              disabled={loading || showContinue}
             />
           </div>
           <div style={{ marginBottom: 20 }}>
@@ -124,13 +184,14 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="current-password"
+              disabled={loading || showContinue}
             />
           </div>
           <button
             type="submit"
             className="btn-primary"
             style={{ width: '100%' }}
-            disabled={loading}
+            disabled={loading || showContinue}
           >
             {loading ? 'Signing in…' : 'Sign in'}
           </button>
@@ -147,7 +208,7 @@ export default function LoginPage() {
               padding: 12,
               borderRadius: 8,
               background: 'rgba(0,0,0,0.06)',
-              maxHeight: 220,
+              maxHeight: 360,
               overflow: 'auto',
               fontSize: 10,
               fontFamily: 'ui-monospace, monospace',
@@ -156,8 +217,18 @@ export default function LoginPage() {
             }}
           >
             <div className="eyebrow" style={{ marginBottom: 8 }}>
-              Debug (saved in this browser — scroll to copy)
+              Debug (stays until you open the dashboard — scroll to copy)
             </div>
+            {!showContinue ? (
+              <button
+                type="button"
+                className="btn-primary"
+                style={{ marginBottom: 10, fontSize: 11, padding: '6px 12px' }}
+                onClick={copyDebug}
+              >
+                Copy debug to clipboard
+              </button>
+            ) : null}
             {persistedErr || error ? (
               <div style={{ color: 'var(--red)', marginBottom: 10 }}>
                 <strong>Error:</strong> {persistedErr || error}
