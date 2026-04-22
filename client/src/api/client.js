@@ -19,23 +19,6 @@ export async function apiRequest(path, { token, method = 'GET', body } = {}) {
     root.startsWith('http://') &&
     !root.includes('localhost')
   ) {
-    // #region agent log
-    fetch('http://127.0.0.1:7904/ingest/5b45e50a-8745-4974-be29-ba0dbafe7bcf', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Debug-Session-Id': 'd02cd3',
-      },
-      body: JSON.stringify({
-        sessionId: 'd02cd3',
-        location: 'client.js:apiRequest',
-        message: 'mixed_content_blocked',
-        data: { apiHost: safeApiOrigin(root).host },
-        timestamp: Date.now(),
-        hypothesisId: 'E',
-      }),
-    }).catch(() => {});
-    // #endregion
     const origin = safeApiOrigin(root);
     throw new Error(
       `API URL uses http:// (${origin.host}) but this page is https:// (mixed content). Set VITE_API_URL to your server https:// URL on Railway and redeploy the client.`

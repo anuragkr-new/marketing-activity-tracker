@@ -8,8 +8,6 @@ const themesRoutes = require('./routes/themes');
 const initiativesRoutes = require('./routes/initiatives');
 const weeksRoutes = require('./routes/weeks');
 const activityRoutes = require('./routes/activity');
-const { requireAuth, attachDbUser } = require('./middleware/auth');
-
 const app = express();
 const PORT = Number(process.env.PORT) || 4000;
 
