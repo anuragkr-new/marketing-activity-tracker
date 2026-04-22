@@ -1,28 +1,7 @@
+import { agentDebugLog } from '../utils/agentDebug.js';
+
 const base = () =>
   (import.meta.env.VITE_API_URL || 'http://localhost:4000').replace(/\/$/, '');
-
-// #region agent log
-function agentLog(location, message, data, hypothesisId) {
-  const payload = {
-    sessionId: 'd02cd3',
-    timestamp: Date.now(),
-    location,
-    message,
-    data,
-    hypothesisId,
-  };
-  const line = JSON.stringify(payload);
-  console.error('__AGENT_DEBUG__', line);
-  fetch('http://127.0.0.1:7904/ingest/5b45e50a-8745-4974-be29-ba0dbafe7bcf', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Debug-Session-Id': 'd02cd3',
-    },
-    body: line,
-  }).catch(() => {});
-}
-// #endregion
 
 function safeApiOrigin(root) {
   try {
@@ -38,7 +17,7 @@ export async function apiRequest(path, { token, method = 'GET', body } = {}) {
   const t0 = Date.now();
   const origin = safeApiOrigin(root);
 
-  agentLog('client.js:apiRequest:start', 'fetch start', { path, method, origin }, 'H1');
+  agentDebugLog('client.js:apiRequest:start', 'fetch start', { path, method, origin }, 'H1');
 
   if (
     typeof window !== 'undefined' &&
@@ -46,7 +25,7 @@ export async function apiRequest(path, { token, method = 'GET', body } = {}) {
     root.startsWith('http://') &&
     !root.includes('localhost')
   ) {
-    agentLog(
+    agentDebugLog(
       'client.js:apiRequest:mixed-content',
       'blocked mixed content (https page + http API)',
       { pageOrigin: window.location.origin, apiOrigin: origin },
@@ -73,7 +52,7 @@ export async function apiRequest(path, { token, method = 'GET', body } = {}) {
       signal: controller.signal,
     });
   } catch (e) {
-    agentLog(
+    agentDebugLog(
       'client.js:apiRequest:fetch-error',
       'fetch threw',
       {
@@ -94,7 +73,7 @@ export async function apiRequest(path, { token, method = 'GET', body } = {}) {
     clearTimeout(timer);
   }
 
-  agentLog(
+  agentDebugLog(
     'client.js:apiRequest:response',
     'fetch response',
     { status: res.status, ms: Date.now() - t0, path },

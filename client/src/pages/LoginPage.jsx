@@ -1,28 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
-
-// #region agent log
-function agentLog(location, message, data, hypothesisId) {
-  const payload = {
-    sessionId: 'd02cd3',
-    timestamp: Date.now(),
-    location,
-    message,
-    data,
-    hypothesisId,
-  };
-  const line = JSON.stringify(payload);
-  console.error('__AGENT_DEBUG__', line);
-  fetch('http://127.0.0.1:7904/ingest/5b45e50a-8745-4974-be29-ba0dbafe7bcf', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Debug-Session-Id': 'd02cd3',
-    },
-    body: line,
-  }).catch(() => {});
-}
-// #endregion
+import {
+  agentDebugLog,
+  clearLoginDebug,
+  persistLoginError,
+  readDebugLogLines,
+  readLastLoginError,
+} from '../utils/agentDebug.js';
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -30,12 +15,32 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [panelLines, setPanelLines] = useState(() => readDebugLogLines());
+  const [persistedErr, setPersistedErr] = useState(() => readLastLoginError());
+
+  useEffect(() => {
+    setPanelLines(readDebugLogLines());
+    setPersistedErr(readLastLoginError());
+  }, []);
+
+  useEffect(() => {
+    if (!loading) return undefined;
+    const id = setInterval(() => {
+      setPanelLines(readDebugLogLines());
+    }, 400);
+    return () => clearInterval(id);
+  }, [loading]);
 
   async function onSubmit(e) {
     e.preventDefault();
     setError('');
-    setLoading(true);
-    agentLog(
+    clearLoginDebug();
+    setPanelLines([]);
+    setPersistedErr('');
+    flushSync(() => {
+      setLoading(true);
+    });
+    agentDebugLog(
       'LoginPage.jsx:onSubmit',
       'submit start',
       { hasUser: Boolean(username?.trim()), hasPass: Boolean(password) },
@@ -43,23 +48,25 @@ export default function LoginPage() {
     );
     try {
       await login(username, password);
-      agentLog(
+      agentDebugLog(
         'LoginPage.jsx:after-login',
         'login resolved, navigating',
         {},
         'H6'
       );
-      // Full navigation avoids a race where `navigate('/')` runs before
-      // AuthProvider state updates and `RequireAuth` bounces back to /login.
+      clearLoginDebug();
       window.location.replace('/');
     } catch (err) {
-      agentLog(
+      const msg = err.message || 'Sign in failed';
+      agentDebugLog(
         'LoginPage.jsx:catch',
         'login failed',
         { name: err?.name, message: String(err?.message || err) },
         'H7'
       );
-      const msg = err.message || 'Sign in failed';
+      persistLoginError(msg);
+      setPanelLines(readDebugLogLines());
+      setPersistedErr(readLastLoginError());
       setError(
         msg === 'Failed to fetch'
           ? `${msg} — check the API URL (VITE_API_URL must be https:// when the app is on https://) and CORS (CLIENT_ORIGIN on the server).`
@@ -68,6 +75,10 @@ export default function LoginPage() {
       setLoading(false);
     }
   }
+
+  const showPanel = Boolean(
+    loading || panelLines.length || persistedErr || error
+  );
 
   return (
     <div
@@ -82,7 +93,7 @@ export default function LoginPage() {
     >
       <div
         className="content-wrap"
-        style={{ width: '100%', maxWidth: 380, padding: '32px 28px' }}
+        style={{ width: '100%', maxWidth: 420, padding: '32px 28px' }}
       >
         <h1
           className="page-title"
@@ -129,6 +140,39 @@ export default function LoginPage() {
             </p>
           ) : null}
         </form>
+        {showPanel ? (
+          <div
+            style={{
+              marginTop: 20,
+              padding: 12,
+              borderRadius: 8,
+              background: 'rgba(0,0,0,0.06)',
+              maxHeight: 220,
+              overflow: 'auto',
+              fontSize: 10,
+              fontFamily: 'ui-monospace, monospace',
+              lineHeight: 1.35,
+              wordBreak: 'break-word',
+            }}
+          >
+            <div className="eyebrow" style={{ marginBottom: 8 }}>
+              Debug (saved in this browser — scroll to copy)
+            </div>
+            {persistedErr || error ? (
+              <div style={{ color: 'var(--red)', marginBottom: 10 }}>
+                <strong>Error:</strong> {persistedErr || error}
+              </div>
+            ) : null}
+            {loading && !panelLines.length ? (
+              <div style={{ opacity: 0.7 }}>Waiting for API…</div>
+            ) : null}
+            {panelLines.map((line, i) => (
+              <div key={i} style={{ opacity: 0.85 }}>
+                {line}
+              </div>
+            ))}
+          </div>
+        ) : null}
       </div>
     </div>
   );
