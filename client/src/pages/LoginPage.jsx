@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { flushSync } from 'react-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
+import { clearLoginHold } from '../utils/loginHold.js';
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -17,8 +18,46 @@ export default function LoginPage() {
     });
     try {
       await login(username, password);
+      // #region agent log
+      fetch('http://127.0.0.1:7904/ingest/5b45e50a-8745-4974-be29-ba0dbafe7bcf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Debug-Session-Id': 'd02cd3',
+        },
+        body: JSON.stringify({
+          sessionId: 'd02cd3',
+          location: 'LoginPage.jsx:onSubmit',
+          message: 'before_location_replace',
+          data: { href: typeof window !== 'undefined' ? window.location.href : '' },
+          timestamp: Date.now(),
+          hypothesisId: 'A',
+        }),
+      }).catch(() => {});
+      // #endregion
       window.location.replace('/');
     } catch (err) {
+      clearLoginHold();
+      // #region agent log
+      fetch('http://127.0.0.1:7904/ingest/5b45e50a-8745-4974-be29-ba0dbafe7bcf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Debug-Session-Id': 'd02cd3',
+        },
+        body: JSON.stringify({
+          sessionId: 'd02cd3',
+          location: 'LoginPage.jsx:onSubmit',
+          message: 'login_submit_catch',
+          data: {
+            name: err?.name,
+            msg: String(err?.message || '').slice(0, 200),
+          },
+          timestamp: Date.now(),
+          hypothesisId: 'C',
+        }),
+      }).catch(() => {});
+      // #endregion
       const msg = err.message || 'Sign in failed';
       setError(
         msg === 'Failed to fetch'
