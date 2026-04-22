@@ -8,7 +8,7 @@ export function AdminPanelProvider({ children }) {
 
   const value = useMemo(
     () => ({ open, setOpen, tab, setTab }),
-    [open, tab]
+    [open, setOpen, tab, setTab]
   );
 
   return (

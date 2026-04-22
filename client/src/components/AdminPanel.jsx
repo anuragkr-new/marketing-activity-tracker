@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useAdminPanel } from '../contexts/AdminPanelContext.jsx';
 
 export default function AdminPanel({ onChanged }) {
-  const { api, user } = useAuth();
+  const { api, user, publicMode } = useAuth();
   const { open, setOpen, tab, setTab } = useAdminPanel();
+  /** Ignore backdrop closes for a few ms after open (avoids same gesture closing the panel). */
+  const panelOpenedAtRef = useRef(0);
   const [users, setUsers] = useState([]);
   const [themes, setThemes] = useState([]);
   const [initiatives, setInitiatives] = useState([]);
@@ -34,9 +36,9 @@ export default function AdminPanel({ onChanged }) {
         api('/api/themes'),
         api('/api/initiatives'),
       ]);
-      setUsers(u);
-      setThemes(t);
-      setInitiatives(i);
+      setUsers(Array.isArray(u) ? u : []);
+      setThemes(Array.isArray(t) ? t : []);
+      setInitiatives(Array.isArray(i) ? i : []);
     } catch (e) {
       setError(e.message || 'Failed to load');
     }
@@ -46,10 +48,25 @@ export default function AdminPanel({ onChanged }) {
     if (open) refresh();
   }, [open, refresh]);
 
+  useEffect(() => {
+    if (open) panelOpenedAtRef.current = Date.now();
+  }, [open]);
+
   if (!open) return null;
 
   const activeInis = initiatives.filter((x) => x.status === 'active');
   const doneInis = initiatives.filter((x) => x.status === 'completed');
+
+  const themeSelectValue = themes.some(
+    (th) => String(th.id) === String(iniDraft.theme_id)
+  )
+    ? String(iniDraft.theme_id)
+    : '';
+  const ownerSelectValue = users.some(
+    (u) => String(u.id) === String(iniDraft.owner_id)
+  )
+    ? String(iniDraft.owner_id)
+    : '';
 
   async function submitUser(e) {
     e.preventDefault();
@@ -136,7 +153,10 @@ export default function AdminPanel({ onChanged }) {
           background: 'rgba(26,25,22,0.25)',
           zIndex: 40,
         }}
-        onClick={() => setOpen(false)}
+        onClick={() => {
+          if (Date.now() - panelOpenedAtRef.current < 280) return;
+          setOpen(false);
+        }}
       />
       <aside
         style={{
@@ -264,13 +284,14 @@ export default function AdminPanel({ onChanged }) {
                     <button
                       type="button"
                       className="btn-link danger"
-                      disabled={u.id === user.id}
+                      disabled={!publicMode && u.id === user.id}
                       style={{
-                        opacity: u.id === user.id ? 0.35 : 1,
-                        cursor: u.id === user.id ? 'not-allowed' : 'pointer',
+                        opacity: !publicMode && u.id === user.id ? 0.35 : 1,
+                        cursor:
+                          !publicMode && u.id === user.id ? 'not-allowed' : 'pointer',
                       }}
                       onClick={() => {
-                        if (u.id === user.id) return;
+                        if (!publicMode && u.id === user.id) return;
                         if (!window.confirm(`Remove ${u.username}?`)) return;
                         api(`/api/users/${u.id}`, { method: 'DELETE' })
                           .then(refresh)
@@ -429,7 +450,7 @@ export default function AdminPanel({ onChanged }) {
                   ) : (
                     <select
                       className="select"
-                      value={iniDraft.theme_id}
+                      value={themeSelectValue}
                       onChange={(e) =>
                         setIniDraft((d) => ({ ...d, theme_id: e.target.value }))
                       }
@@ -447,7 +468,7 @@ export default function AdminPanel({ onChanged }) {
                   </div>
                   <select
                     className="select"
-                    value={iniDraft.owner_id}
+                    value={ownerSelectValue}
                     onChange={(e) =>
                       setIniDraft((d) => ({ ...d, owner_id: e.target.value }))
                     }
@@ -495,9 +516,9 @@ export default function AdminPanel({ onChanged }) {
                       className="btn-primary"
                       disabled={
                         !iniDraft.name ||
-                        !iniDraft.owner_id ||
+                        !ownerSelectValue ||
                         themes.length === 0 ||
-                        !iniDraft.theme_id
+                        !themeSelectValue
                       }
                     >
                       {iniDraft.id ? 'Save initiative' : 'Add initiative'}
