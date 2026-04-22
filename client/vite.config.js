@@ -34,6 +34,17 @@ function emit(payload) {
 function railwayDebugPlugin() {
   return {
     name: 'agent-railway-debug',
+    configureServer(server) {
+      server.httpServer?.once('listening', () => {
+        const addr = server.httpServer?.address();
+        emit({
+          hypothesisId: 'H3',
+          location: 'vite.config.js:dev-listening',
+          message: 'dev server listening',
+          data: { address: addr },
+        });
+      });
+    },
     configurePreviewServer(server) {
       server.httpServer?.once('listening', () => {
         const addr = server.httpServer?.address();
@@ -67,8 +78,11 @@ export default defineConfig(({ command }) => {
 
   return {
     plugins: [react(), railwayDebugPlugin()],
+    // When Railway runs `vite` (dev), PORT is set (e.g. 8080) but Vite defaulted to 5173 + localhost → edge 502.
     server: {
-      port: 5173,
+      host: true,
+      port: parseInt(process.env.PORT || '5173', 10),
+      strictPort: Boolean(process.env.PORT),
     },
     // Railway (and similar) set PORT and require listening on all interfaces.
     preview: {
