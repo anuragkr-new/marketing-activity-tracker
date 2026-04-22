@@ -13,10 +13,16 @@ const { requireAuth, attachDbUser } = require('./middleware/auth');
 const app = express();
 const PORT = Number(process.env.PORT) || 4000;
 
-const clientOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
+// Comma-separated lets you allow local + Railway (e.g. CLIENT_ORIGINS=http://localhost:5173,https://client.up.railway.app)
+const clientOriginsRaw =
+  process.env.CLIENT_ORIGINS || process.env.CLIENT_ORIGIN || 'http://localhost:5173';
+const clientOrigins = clientOriginsRaw
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
 app.use(
   cors({
-    origin: clientOrigin,
+    origin: clientOrigins.length === 1 ? clientOrigins[0] : clientOrigins,
     credentials: true,
   })
 );
@@ -39,6 +45,6 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server listening on http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server listening on http://0.0.0.0:${PORT}`);
 });
