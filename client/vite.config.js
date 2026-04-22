@@ -62,6 +62,8 @@ function railwayDebugPlugin() {
 
 export default defineConfig(({ command }) => {
   // #region agent log
+  const onRailway = Boolean(process.env.RAILWAY_ENVIRONMENT);
+
   emit({
     hypothesisId: 'H4',
     location: 'vite.config.js:defineConfig',
@@ -72,9 +74,13 @@ export default defineConfig(({ command }) => {
       PORT: process.env.PORT || null,
       NODE_ENV: process.env.NODE_ENV || null,
       RAILWAY_ENVIRONMENT: process.env.RAILWAY_ENVIRONMENT || null,
+      allowedHostsOpen: onRailway,
     },
   });
   // #endregion
+
+  // Vite default allowedHosts is [] (only localhost + IPs). Railway sends Host: *.up.railway.app → blocked → 502 at edge.
+  const railwayHosts = onRailway ? { allowedHosts: true } : {};
 
   return {
     plugins: [react(), railwayDebugPlugin()],
@@ -84,12 +90,14 @@ export default defineConfig(({ command }) => {
       host: '0.0.0.0',
       port: parseInt(process.env.PORT || '5173', 10),
       strictPort: Boolean(process.env.PORT),
+      ...railwayHosts,
     },
     // Railway (and similar) set PORT and require listening on all interfaces.
     preview: {
       host: '0.0.0.0',
       port: parseInt(process.env.PORT || '4173', 10),
       strictPort: true,
+      ...railwayHosts,
     },
   };
 });
