@@ -9,6 +9,36 @@ const activityRoutes = require('./routes/activity');
 const app = express();
 const PORT = Number(process.env.PORT) || 4000;
 
+// #region agent log
+console.error(
+  '[AGENT_DEBUG]',
+  JSON.stringify({
+    sessionId: 'a9573c',
+    hypothesisId: 'H1',
+    location: 'server/index.js:boot',
+    message: 'express_api_boot',
+    data: {
+      railwayService: process.env.RAILWAY_SERVICE_NAME || null,
+      railwayReplica: process.env.RAILWAY_REPLICA_ID || null,
+      port: PORT,
+    },
+    timestamp: Date.now(),
+  })
+);
+fetch('http://127.0.0.1:7904/ingest/5b45e50a-8745-4974-be29-ba0dbafe7bcf', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'a9573c' },
+  body: JSON.stringify({
+    sessionId: 'a9573c',
+    hypothesisId: 'H1',
+    location: 'server/index.js:boot',
+    message: 'express_api_boot',
+    data: { port: PORT },
+    timestamp: Date.now(),
+  }),
+}).catch(() => {});
+// #endregion
+
 const clientOriginsRaw =
   process.env.CLIENT_ORIGINS || process.env.CLIENT_ORIGIN || 'http://localhost:5173';
 const clientOrigins = clientOriginsRaw
@@ -22,6 +52,37 @@ app.use(
   })
 );
 app.use(express.json());
+
+// #region agent log
+app.use((req, res, next) => {
+  if (req.method === 'GET' && req.path === '/') {
+    console.error(
+      '[AGENT_DEBUG]',
+      JSON.stringify({
+        sessionId: 'a9573c',
+        hypothesisId: 'H2',
+        location: 'server/index.js:root_request',
+        message: 'express_get_slash_no_handler',
+        data: { path: req.path },
+        timestamp: Date.now(),
+      })
+    );
+    fetch('http://127.0.0.1:7904/ingest/5b45e50a-8745-4974-be29-ba0dbafe7bcf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'a9573c' },
+      body: JSON.stringify({
+        sessionId: 'a9573c',
+        hypothesisId: 'H2',
+        location: 'server/index.js:root_request',
+        message: 'express_get_slash',
+        data: { path: req.path },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+  }
+  next();
+});
+// #endregion
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 

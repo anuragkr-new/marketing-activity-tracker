@@ -1,17 +1,12 @@
-# Default service: Node API. Link Railway Postgres so DATABASE_URL is set; set CLIENT_ORIGINS
-# to your deployed client origin(s). After first deploy, run once in a Railway shell (with
-# DATABASE_URL): `npm run db:setup` (migrate + seed weeks).
+# Monorepo: do NOT set a global startCommand here — it would apply to every Railway
+# service from this repo and force the API on the client (browser shows "Cannot GET /").
 #
-# Add a second Railway service for the client from the same repo: build
-# `npm ci && npm run build -w client`, start `npm run start -w client`, and set VITE_API_URL
-# (public API URL) plus VITE_ADMIN_PIN at build time. Override deploy start here in the
-# dashboard if this file’s startCommand is not appropriate for that service.
+# In the Railway dashboard, set per service:
+# - API:  Start = npm run start:server   |  Variables: DATABASE_URL, CLIENT_ORIGINS
+#         Optional: Health check path = /api/health
+# - Client: Build = npm ci && npm run build -w client
+#           Start = npm run start -w client
+#           Variables (build-time): VITE_API_URL, VITE_ADMIN_PIN
 
 [build]
 builder = "NIXPACKS"
-
-[deploy]
-startCommand = "npm run start:server"
-healthcheckPath = "/api/health"
-healthcheckTimeout = 300
-restartPolicyType = "ON_FAILURE"

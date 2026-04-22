@@ -9,6 +9,39 @@ const require = createRequire(import.meta.url);
 const port = process.env.PORT || '3000';
 const distDir = join(__dirname, 'dist');
 
+// #region agent log
+const distIndex = join(distDir, 'index.html');
+const distExists = existsSync(distIndex);
+console.error(
+  '[AGENT_DEBUG]',
+  JSON.stringify({
+    sessionId: 'a9573c',
+    hypothesisId: 'H3',
+    location: 'client/debug-start.mjs:boot',
+    message: 'client_static_server_entry',
+    data: {
+      distExists,
+      cwd: process.cwd(),
+      dirname: __dirname,
+      port: String(port),
+    },
+    timestamp: Date.now(),
+  })
+);
+fetch('http://127.0.0.1:7904/ingest/5b45e50a-8745-4974-be29-ba0dbafe7bcf', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'a9573c' },
+  body: JSON.stringify({
+    sessionId: 'a9573c',
+    hypothesisId: 'H3',
+    location: 'client/debug-start.mjs:boot',
+    message: 'client_static_server_entry',
+    data: { distExists, cwd: process.cwd(), port: String(port) },
+    timestamp: Date.now(),
+  }),
+}).catch(() => {});
+// #endregion
+
 if (!existsSync(join(distDir, 'index.html'))) {
   console.error('dist/index.html missing — run build first');
   process.exit(1);
