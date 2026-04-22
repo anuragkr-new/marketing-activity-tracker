@@ -5,10 +5,11 @@ const { pool } = require('../db/pool');
 const router = express.Router();
 
 const listSelect = `
-  SELECT i.id, i.name, i.theme_id, i.owner, i.landing_page_url, i.status, i.created_at,
+  SELECT i.id, i.name, i.theme_id, i.owner_id, o.name AS owner, i.landing_page_url, i.status, i.created_at,
          t.name AS theme_name
   FROM initiatives i
   LEFT JOIN themes t ON t.id = i.theme_id
+  LEFT JOIN owners o ON o.id = i.owner_id
 `;
 
 router.get('/', async (_req, res) => {
@@ -33,7 +34,7 @@ router.post('/', async (req, res) => {
     .object({
       name: z.string().min(1).max(255),
       theme_id: z.number().int().positive(),
-      owner: z.string().min(1).max(100),
+      owner_id: z.number().int().positive(),
       landing_page_url: z
         .preprocess(
           (v) => (v === '' || v === undefined ? null : v),
@@ -43,10 +44,10 @@ router.post('/', async (req, res) => {
     })
     .parse(req.body);
   const { rows } = await pool.query(
-    `INSERT INTO initiatives (name, theme_id, owner, landing_page_url, status)
+    `INSERT INTO initiatives (name, theme_id, owner_id, landing_page_url, status)
      VALUES ($1, $2, $3, $4, 'active')
-     RETURNING id, name, theme_id, owner, landing_page_url, status, created_at`,
-    [body.name.trim(), body.theme_id, body.owner.trim(), body.landing_page_url || null]
+     RETURNING id, name, theme_id, owner_id, landing_page_url, status, created_at`,
+    [body.name.trim(), body.theme_id, body.owner_id, body.landing_page_url || null]
   );
   const full = await pool.query(`${listSelect} WHERE i.id = $1`, [rows[0].id]);
   res.status(201).json(full.rows[0]);
@@ -61,7 +62,7 @@ router.put('/:id', async (req, res) => {
     .object({
       name: z.string().min(1).max(255).optional(),
       theme_id: z.number().int().positive().optional().nullable(),
-      owner: z.string().min(1).max(100).optional(),
+      owner_id: z.number().int().positive().optional(),
       landing_page_url: z.string().url().optional().nullable().or(z.literal('')),
       status: z.enum(['active', 'completed']).optional(),
     })
@@ -77,9 +78,9 @@ router.put('/:id', async (req, res) => {
     fields.push(`theme_id = $${i++}`);
     vals.push(body.theme_id);
   }
-  if (body.owner != null) {
-    fields.push(`owner = $${i++}`);
-    vals.push(body.owner.trim());
+  if (body.owner_id != null) {
+    fields.push(`owner_id = $${i++}`);
+    vals.push(body.owner_id);
   }
   if (body.landing_page_url !== undefined) {
     fields.push(`landing_page_url = $${i++}`);

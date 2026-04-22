@@ -7,15 +7,17 @@ export default function AdminPanel({ onChanged }) {
   const { open, setOpen, tab, setTab } = useAdminPanel();
   const panelOpenedAtRef = useRef(0);
   const [themes, setThemes] = useState([]);
+  const [owners, setOwners] = useState([]);
   const [initiatives, setInitiatives] = useState([]);
   const [error, setError] = useState('');
   const [addingTheme, setAddingTheme] = useState('');
+  const [addingOwner, setAddingOwner] = useState('');
   const [showIniForm, setShowIniForm] = useState(false);
   const [iniDraft, setIniDraft] = useState({
     id: null,
     name: '',
     theme_id: '',
-    owner: '',
+    owner_id: '',
     landing_page_url: '',
     status: 'active',
   });
@@ -23,8 +25,13 @@ export default function AdminPanel({ onChanged }) {
   const refresh = useCallback(async () => {
     setError('');
     try {
-      const [t, i] = await Promise.all([api('/api/themes'), api('/api/initiatives')]);
+      const [t, o, i] = await Promise.all([
+        api('/api/themes'),
+        api('/api/owners'),
+        api('/api/initiatives'),
+      ]);
       setThemes(Array.isArray(t) ? t : []);
+      setOwners(Array.isArray(o) ? o : []);
       setInitiatives(Array.isArray(i) ? i : []);
     } catch (e) {
       setError(e.message || 'Failed to load');
@@ -48,6 +55,10 @@ export default function AdminPanel({ onChanged }) {
     ? String(iniDraft.theme_id)
     : '';
 
+  const ownerSelectValue = owners.some((ow) => String(ow.id) === String(iniDraft.owner_id))
+    ? String(iniDraft.owner_id)
+    : '';
+
   async function submitIni(e) {
     e.preventDefault();
     setError('');
@@ -55,7 +66,7 @@ export default function AdminPanel({ onChanged }) {
       const body = {
         name: iniDraft.name,
         theme_id: Number(iniDraft.theme_id),
-        owner: iniDraft.owner.trim(),
+        owner_id: Number(iniDraft.owner_id),
         landing_page_url: iniDraft.landing_page_url || null,
       };
       if (iniDraft.id) {
@@ -74,10 +85,27 @@ export default function AdminPanel({ onChanged }) {
         id: null,
         name: '',
         theme_id: '',
-        owner: '',
+        owner_id: '',
         landing_page_url: '',
         status: 'active',
       });
+      await refresh();
+      onChanged?.();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function addOwner(e) {
+    e.preventDefault();
+    if (!addingOwner.trim()) return;
+    setError('');
+    try {
+      await api('/api/owners', {
+        method: 'POST',
+        body: { name: addingOwner.trim() },
+      });
+      setAddingOwner('');
       await refresh();
       onChanged?.();
     } catch (err) {
@@ -161,7 +189,7 @@ export default function AdminPanel({ onChanged }) {
             padding: '0 12px',
           }}
         >
-          {['initiatives', 'themes'].map((t) => (
+          {['initiatives', 'themes', 'owners'].map((t) => (
             <button
               key={t}
               type="button"
@@ -246,6 +274,62 @@ export default function AdminPanel({ onChanged }) {
             </div>
           ) : null}
 
+          {tab === 'owners' ? (
+            <div>
+              {owners.map((ow) => {
+                const inUse = initiatives.some((i) => i.owner_id === ow.id);
+                return (
+                  <div
+                    key={ow.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '10px 0',
+                      borderBottom: '0.5px solid var(--rule)',
+                    }}
+                  >
+                    <div style={{ fontSize: 12 }}>{ow.name}</div>
+                    <button
+                      type="button"
+                      className="btn-link danger"
+                      disabled={inUse}
+                      title={inUse ? 'In use' : undefined}
+                      style={{
+                        opacity: inUse ? 0.35 : 1,
+                        cursor: inUse ? 'not-allowed' : 'pointer',
+                      }}
+                      onClick={() => {
+                        if (inUse) return;
+                        if (!window.confirm(`Delete owner “${ow.name}”?`)) return;
+                        api(`/api/owners/${ow.id}`, { method: 'DELETE' })
+                          .then(refresh)
+                          .then(() => onChanged?.())
+                          .catch((err) => setError(err.message));
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                );
+              })}
+              <form
+                onSubmit={addOwner}
+                style={{ display: 'flex', gap: 8, marginTop: 16 }}
+              >
+                <input
+                  className="input"
+                  placeholder="New owner name"
+                  value={addingOwner}
+                  onChange={(e) => setAddingOwner(e.target.value)}
+                />
+                <button type="submit" className="btn-primary">
+                  Add
+                </button>
+              </form>
+            </div>
+          ) : null}
+
           {tab === 'initiatives' ? (
             <div>
               {showIniForm ? (
@@ -284,12 +368,26 @@ export default function AdminPanel({ onChanged }) {
                   <div className="eyebrow" style={{ margin: '12px 0 6px' }}>
                     Owner
                   </div>
-                  <input
-                    className="input"
-                    value={iniDraft.owner}
-                    onChange={(e) => setIniDraft((d) => ({ ...d, owner: e.target.value }))}
-                    placeholder="Name"
-                  />
+                  {owners.length === 0 ? (
+                    <p className="muted" style={{ fontSize: 11 }}>
+                      No owners found. Add an owner in the Owners tab first.
+                    </p>
+                  ) : (
+                    <select
+                      className="select"
+                      value={ownerSelectValue}
+                      onChange={(e) =>
+                        setIniDraft((d) => ({ ...d, owner_id: e.target.value }))
+                      }
+                    >
+                      <option value="">Select owner</option>
+                      {owners.map((ow) => (
+                        <option key={ow.id} value={ow.id}>
+                          {ow.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                   <div className="eyebrow" style={{ margin: '12px 0 6px' }}>
                     Landing page URL (optional)
                   </div>
@@ -326,7 +424,8 @@ export default function AdminPanel({ onChanged }) {
                       className="btn-primary"
                       disabled={
                         !iniDraft.name.trim() ||
-                        !iniDraft.owner.trim() ||
+                        owners.length === 0 ||
+                        !ownerSelectValue ||
                         themes.length === 0 ||
                         !themeSelectValue
                       }
@@ -342,7 +441,7 @@ export default function AdminPanel({ onChanged }) {
                           id: null,
                           name: '',
                           theme_id: '',
-                          owner: '',
+                          owner_id: '',
                           landing_page_url: '',
                           status: 'active',
                         });
@@ -387,7 +486,7 @@ export default function AdminPanel({ onChanged }) {
                             id: i.id,
                             name: i.name,
                             theme_id: String(i.theme_id || ''),
-                            owner: i.owner || '',
+                            owner_id: String(i.owner_id ?? ''),
                             landing_page_url: i.landing_page_url || '',
                             status: i.status,
                           });
@@ -475,7 +574,7 @@ export default function AdminPanel({ onChanged }) {
                       id: null,
                       name: '',
                       theme_id: themes[0]?.id ? String(themes[0].id) : '',
-                      owner: '',
+                      owner_id: owners[0]?.id ? String(owners[0].id) : '',
                       landing_page_url: '',
                       status: 'active',
                     });

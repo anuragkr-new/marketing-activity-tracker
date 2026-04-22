@@ -8,6 +8,7 @@ require('express-async-errors');
 const express = require('express');
 const cors = require('cors');
 const themesRoutes = require('./routes/themes');
+const ownersRoutes = require('./routes/owners');
 const initiativesRoutes = require('./routes/initiatives');
 const weeksRoutes = require('./routes/weeks');
 const activityRoutes = require('./routes/activity');
@@ -61,6 +62,7 @@ app.get('/api/health', async (_req, res) => {
 });
 
 app.use('/api/themes', themesRoutes);
+app.use('/api/owners', ownersRoutes);
 app.use('/api/initiatives', initiativesRoutes);
 app.use('/api/weeks', weeksRoutes);
 app.use('/api/activity', activityRoutes);
