@@ -1,7 +1,6 @@
-import { appendFileSync } from 'node:fs';
+import { appendFileSync, existsSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -37,12 +36,8 @@ function emit(payload) {
 // #endregion
 
 const require = createRequire(import.meta.url);
-let viteResolved = null;
-try {
-  viteResolved = require.resolve('vite/package.json');
-} catch (e) {
-  viteResolved = null;
-}
+const port = process.env.PORT || '3000';
+const distDir = join(__dirname, 'dist');
 
 emit({
   hypothesisId: 'H1',
@@ -54,11 +49,10 @@ emit({
     PORT: process.env.PORT || null,
     NODE_ENV: process.env.NODE_ENV || null,
     RAILWAY_ENVIRONMENT: process.env.RAILWAY_ENVIRONMENT || null,
-    vitePackageJson: viteResolved,
+    mode: 'serve-static',
   },
 });
 
-const distDir = join(__dirname, 'dist');
 emit({
   hypothesisId: 'H2',
   location: 'debug-start.mjs:dist',
@@ -66,28 +60,51 @@ emit({
   data: { distExists: existsSync(distDir), distIndex: existsSync(join(distDir, 'index.html')) },
 });
 
-if (!viteResolved) {
+if (!existsSync(join(distDir, 'index.html'))) {
   emit({
-    hypothesisId: 'H1',
+    hypothesisId: 'H2',
     location: 'debug-start.mjs:abort',
-    message: 'vite not resolvable — likely devDependencies omitted',
+    message: 'dist/index.html missing — run build first',
     data: {},
   });
   process.exit(1);
 }
 
-const viteBin = join(viteResolved, '..', 'bin', 'vite.js');
-const child = spawn(process.execPath, [viteBin, 'preview'], {
-  stdio: 'inherit',
-  cwd: __dirname,
-  env: process.env,
+let serveMain;
+try {
+  serveMain = require.resolve('serve/build/main.js');
+} catch (e) {
+  emit({
+    hypothesisId: 'H1',
+    location: 'debug-start.mjs:serve-resolve',
+    message: 'serve package not resolvable',
+    data: { err: String(e?.message || e) },
+  });
+  process.exit(1);
+}
+
+emit({
+  hypothesisId: 'H8',
+  location: 'debug-start.mjs:serve',
+  message: 'spawning serve for dist',
+  data: { serveMain, listen: `tcp://0.0.0.0:${port}` },
 });
+
+const child = spawn(
+  process.execPath,
+  [serveMain, '-s', 'dist', '-l', `tcp://0.0.0.0:${port}`],
+  {
+    stdio: 'inherit',
+    cwd: __dirname,
+    env: process.env,
+  }
+);
 
 child.on('error', (err) => {
   emit({
     hypothesisId: 'H1',
     location: 'debug-start.mjs:spawn-error',
-    message: 'failed to spawn vite preview',
+    message: 'failed to spawn serve',
     data: { err: String(err?.message || err) },
   });
   process.exit(1);
@@ -97,7 +114,7 @@ child.on('exit', (code, signal) => {
   emit({
     hypothesisId: 'H3',
     location: 'debug-start.mjs:exit',
-    message: 'vite preview process exited',
+    message: 'serve process exited',
     data: { code, signal: signal || null },
   });
   process.exit(code ?? 1);
