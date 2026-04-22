@@ -1,5 +1,3 @@
-import { agentDebugLog } from '../utils/agentDebug.js';
-
 const base = () =>
   (import.meta.env.VITE_API_URL || 'http://localhost:4000').replace(/\/$/, '');
 
@@ -14,10 +12,6 @@ function safeApiOrigin(root) {
 
 export async function apiRequest(path, { token, method = 'GET', body } = {}) {
   const root = base();
-  const t0 = Date.now();
-  const origin = safeApiOrigin(root);
-
-  agentDebugLog('client.js:apiRequest:start', 'fetch start', { path, method, origin }, 'H1');
 
   if (
     typeof window !== 'undefined' &&
@@ -25,14 +19,9 @@ export async function apiRequest(path, { token, method = 'GET', body } = {}) {
     root.startsWith('http://') &&
     !root.includes('localhost')
   ) {
-    agentDebugLog(
-      'client.js:apiRequest:mixed-content',
-      'blocked mixed content (https page + http API)',
-      { pageOrigin: window.location.origin, apiOrigin: origin },
-      'H2'
-    );
+    const origin = safeApiOrigin(root);
     throw new Error(
-      'API URL uses http:// but this page is https:// (mixed content). Set VITE_API_URL to your server https:// URL on Railway and redeploy the client.'
+      `API URL uses http:// (${origin.host}) but this page is https:// (mixed content). Set VITE_API_URL to your server https:// URL on Railway and redeploy the client.`
     );
   }
 
@@ -52,17 +41,6 @@ export async function apiRequest(path, { token, method = 'GET', body } = {}) {
       signal: controller.signal,
     });
   } catch (e) {
-    agentDebugLog(
-      'client.js:apiRequest:fetch-error',
-      'fetch threw',
-      {
-        name: e?.name,
-        message: String(e?.message || e),
-        ms: Date.now() - t0,
-        aborted: e?.name === 'AbortError',
-      },
-      e?.name === 'AbortError' ? 'H1' : 'H4'
-    );
     if (e?.name === 'AbortError') {
       throw new Error(
         `Request timed out after ${timeoutMs / 1000}s — API may be unreachable. Check VITE_API_URL and that the server is up.`
@@ -73,12 +51,6 @@ export async function apiRequest(path, { token, method = 'GET', body } = {}) {
     clearTimeout(timer);
   }
 
-  agentDebugLog(
-    'client.js:apiRequest:response',
-    'fetch response',
-    { status: res.status, ms: Date.now() - t0, path },
-    'H3'
-  );
   if (res.status === 204) return null;
   const text = await res.text();
   let data = null;
