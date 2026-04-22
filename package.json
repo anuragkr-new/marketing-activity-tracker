@@ -1,0 +1,16 @@
+{
+  "name": "spyne-activity-tracker",
+  "private": true,
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "scripts": {
+    "migrate": "node server/db/migrate.js",
+    "seed": "node scripts/seed.js",
+    "dev:server": "npm run dev -w server",
+    "dev:client": "npm run dev -w client",
+    "build:client": "npm run build -w client",
+    "start:server": "npm run start -w server"
+  }
+}
