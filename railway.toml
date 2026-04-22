@@ -1,11 +1,13 @@
 # One Railway service: Node serves /api/* and the built React app from client/dist.
 # Variables: DATABASE_URL (Postgres), VITE_ADMIN_PIN (at build time for client bundle).
-# After first deploy: run `npm run db:setup` once in a Railway shell.
+#
+# releaseCommand runs migrate + seed before each new release (idempotent).
 
 [build]
 builder = "NIXPACKS"
 
 [deploy]
+releaseCommand = "npm run db:setup"
 startCommand = "npm start"
 healthcheckPath = "/api/health"
 healthcheckTimeout = 300

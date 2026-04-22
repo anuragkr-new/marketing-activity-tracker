@@ -74,6 +74,20 @@ app.use((err, req, res, _next) => {
     return res.status(400).json({ error: err.errors?.[0]?.message || 'Validation error' });
   }
 
+  if (err?.code === '42P01') {
+    console.error('[api-error]', {
+      method: req.method,
+      path: req.path,
+      code: err.code,
+      message: err.message,
+    });
+    return res.status(503).json({
+      error:
+        'Database tables are missing. Migrations have not been applied. If you use Railway, ensure release runs `npm run db:setup`, or run it once in a shell with DATABASE_URL.',
+      code: '42P01',
+    });
+  }
+
   console.error('[api-error]', {
     method: req.method,
     path: req.path,
