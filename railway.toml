@@ -3,8 +3,9 @@
 #
 # In the Railway dashboard, set per service:
 # - API:  Start = npm run start:server   |  Variables: DATABASE_URL, CLIENT_ORIGINS
+#         Build = `true` (skip) — avoids running the client Vite build on the server image
 #         Optional: Health check path = /api/health
-# - Client: Build = npm ci && npm run build -w client
+# - Client: Build = npm run build -w client   (NOT "npm ci && …" — install already ran; duplicate npm ci causes EBUSY)
 #           Start = npm run start -w client
 #           Variables (build-time): VITE_API_URL, VITE_ADMIN_PIN
 
