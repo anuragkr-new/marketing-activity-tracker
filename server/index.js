@@ -2,8 +2,6 @@ require('dotenv').config();
 require('express-async-errors');
 const express = require('express');
 const cors = require('cors');
-const authRoutes = require('./routes/auth');
-const usersRoutes = require('./routes/users');
 const themesRoutes = require('./routes/themes');
 const initiativesRoutes = require('./routes/initiatives');
 const weeksRoutes = require('./routes/weeks');
@@ -11,7 +9,6 @@ const activityRoutes = require('./routes/activity');
 const app = express();
 const PORT = Number(process.env.PORT) || 4000;
 
-// Comma-separated lets you allow local + Railway (e.g. CLIENT_ORIGINS=http://localhost:5173,https://client.up.railway.app)
 const clientOriginsRaw =
   process.env.CLIENT_ORIGINS || process.env.CLIENT_ORIGIN || 'http://localhost:5173';
 const clientOrigins = clientOriginsRaw
@@ -21,15 +18,13 @@ const clientOrigins = clientOriginsRaw
 app.use(
   cors({
     origin: clientOrigins.length === 1 ? clientOrigins[0] : clientOrigins,
-    credentials: true,
+    credentials: false,
   })
 );
 app.use(express.json());
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
-app.use('/api/auth', authRoutes);
-app.use('/api/users', usersRoutes);
 app.use('/api/themes', themesRoutes);
 app.use('/api/initiatives', initiativesRoutes);
 app.use('/api/weeks', weeksRoutes);

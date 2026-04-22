@@ -10,7 +10,7 @@ function safeApiOrigin(root) {
   }
 }
 
-export async function apiRequest(path, { token, method = 'GET', body } = {}) {
+export async function apiRequest(path, { method = 'GET', body } = {}) {
   const root = base();
 
   if (
@@ -26,7 +26,6 @@ export async function apiRequest(path, { token, method = 'GET', body } = {}) {
   }
 
   const headers = { 'Content-Type': 'application/json' };
-  if (token) headers.Authorization = `Bearer ${token}`;
 
   const controller = new AbortController();
   const timeoutMs = 25000;

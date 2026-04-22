@@ -85,7 +85,7 @@ export default function MobileInitiativeList({
                 >
                   <div style={{ fontWeight: 400 }}>{ini.name}</div>
                   <div className="muted" style={{ fontSize: 10 }}>
-                    {ini.owner_username || '—'}
+                    {ini.owner || '—'}
                   </div>
                 </button>
                 <label

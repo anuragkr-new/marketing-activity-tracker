@@ -1,19 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useAuth } from '../contexts/AuthContext.jsx';
+import { useApi } from '../contexts/ApiContext.jsx';
 import { useAdminPanel } from '../contexts/AdminPanelContext.jsx';
 import { useWindowWidth } from '../hooks/useWindowWidth.js';
 import { formatUS, isDateInWeekRange } from '../utils/dates.js';
 import DesktopGrid from '../components/DesktopGrid.jsx';
 import MobileInitiativeList from '../components/MobileInitiativeList.jsx';
 import AdminPanel from '../components/AdminPanel.jsx';
+import AdminPinModal from '../components/AdminPinModal.jsx';
 
 function activityKey(initiativeId, weekId) {
   return `${initiativeId}_${weekId}`;
 }
 
 export default function DashboardPage() {
-  const { api, user } = useAuth();
-  const { setOpen } = useAdminPanel();
+  const { api } = useApi();
+  const { requestOpenAdmin } = useAdminPanel();
   const width = useWindowWidth();
   const isMobile = width < 768;
 
@@ -28,9 +29,7 @@ export default function DashboardPage() {
     const w = await api(`/api/weeks?offset=${effectiveOffset}`);
     const ini = await api('/api/initiatives');
     const ids = w.map((x) => x.id).join(',');
-    const act = ids
-      ? await api(`/api/activity?week_ids=${ids}`)
-      : [];
+    const act = ids ? await api(`/api/activity?week_ids=${ids}`) : [];
     const map = new Map();
     for (const row of act) {
       map.set(activityKey(row.initiative_id, row.week_id), row);
@@ -69,7 +68,6 @@ export default function DashboardPage() {
       initiative_id: initiativeId,
       week_id: weekId,
       worked_on: nextWorked,
-      updated_by_username: user.username,
       updated_at: new Date().toISOString(),
     };
     setActivityByKey((m) => new Map(m).set(key, optimistic));
@@ -113,16 +111,9 @@ export default function DashboardPage() {
           {currentWeekMeta.label ? (
             <span className="badge badge-muted">{currentWeekMeta.label}</span>
           ) : null}
-          <span className="badge badge-teal">{user.username}</span>
-          {user.role === 'admin' ? (
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => setOpen(true)}
-            >
-              Manage
-            </button>
-          ) : null}
+          <button type="button" className="btn-secondary" onClick={() => requestOpenAdmin()}>
+            Manage
+          </button>
         </div>
       </header>
 
@@ -153,13 +144,12 @@ export default function DashboardPage() {
         </div>
       </main>
 
-      {user.role === 'admin' ? (
-        <AdminPanel
-          onChanged={() => {
-            load().catch(() => {});
-          }}
-        />
-      ) : null}
+      <AdminPinModal />
+      <AdminPanel
+        onChanged={() => {
+          load().catch(() => {});
+        }}
+      />
     </div>
   );
 }

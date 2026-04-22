@@ -1,11 +1,8 @@
 const express = require('express');
 const { z } = require('zod');
 const { pool } = require('../db/pool');
-const { requireAuth, attachDbUser } = require('../middleware/auth');
 
 const router = express.Router();
-
-router.use(requireAuth, attachDbUser);
 
 router.get('/', async (req, res) => {
   const raw = req.query.week_ids;
@@ -20,10 +17,8 @@ router.get('/', async (req, res) => {
     return res.json([]);
   }
   const { rows } = await pool.query(
-    `SELECT a.id, a.initiative_id, a.week_id, a.worked_on, a.updated_at,
-            u.username AS updated_by_username
+    `SELECT a.id, a.initiative_id, a.week_id, a.worked_on, a.updated_at
      FROM activity_log a
-     LEFT JOIN users u ON u.id = a.updated_by
      WHERE a.week_id = ANY($1::int[])
      ORDER BY a.initiative_id, a.week_id`,
     [ids]
@@ -39,10 +34,9 @@ router.post('/toggle', async (req, res) => {
     })
     .parse(req.body);
 
-  const ini = await pool.query(
-    'SELECT id, status FROM initiatives WHERE id = $1',
-    [body.initiative_id]
-  );
+  const ini = await pool.query('SELECT id, status FROM initiatives WHERE id = $1', [
+    body.initiative_id,
+  ]);
   if (!ini.rows[0]) {
     return res.status(404).json({ error: 'Initiative not found' });
   }
@@ -61,32 +55,24 @@ router.post('/toggle', async (req, res) => {
     let row;
     if (!existing.rows[0]) {
       const ins = await client.query(
-        `INSERT INTO activity_log (initiative_id, week_id, worked_on, updated_by, updated_at)
-         VALUES ($1, $2, true, $3, NOW())
+        `INSERT INTO activity_log (initiative_id, week_id, worked_on, updated_at)
+         VALUES ($1, $2, true, NOW())
          RETURNING id, initiative_id, week_id, worked_on, updated_at`,
-        [body.initiative_id, body.week_id, req.dbUser.id]
+        [body.initiative_id, body.week_id]
       );
       row = ins.rows[0];
     } else {
       const upd = await client.query(
         `UPDATE activity_log
-         SET worked_on = NOT worked_on, updated_by = $3, updated_at = NOW()
+         SET worked_on = NOT worked_on, updated_at = NOW()
          WHERE initiative_id = $1 AND week_id = $2
          RETURNING id, initiative_id, week_id, worked_on, updated_at`,
-        [body.initiative_id, body.week_id, req.dbUser.id]
+        [body.initiative_id, body.week_id]
       );
       row = upd.rows[0];
     }
     await client.query('COMMIT');
-    const withUser = await pool.query(
-      `SELECT a.id, a.initiative_id, a.week_id, a.worked_on, a.updated_at,
-              u.username AS updated_by_username
-       FROM activity_log a
-       LEFT JOIN users u ON u.id = a.updated_by
-       WHERE a.id = $1`,
-      [row.id]
-    );
-    res.json(withUser.rows[0]);
+    res.json(row);
   } catch (e) {
     await client.query('ROLLBACK');
     throw e;

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext.jsx';
+import { useApi } from '../contexts/ApiContext.jsx';
 import { formatUS, formatUSDateTime, isDateInWeekRange } from '../utils/dates.js';
 import { loadLastFourWeeksIncludingCurrent } from '../utils/weeksClient.js';
 
@@ -11,7 +11,7 @@ function activityKey(initiativeId, weekId) {
 export default function InitiativeDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { api, user } = useAuth();
+  const { api } = useApi();
   const [initiative, setInitiative] = useState(null);
   const [weeks, setWeeks] = useState([]);
   const [activityByKey, setActivityByKey] = useState(() => new Map());
@@ -21,9 +21,7 @@ export default function InitiativeDetailPage() {
     const ini = await api(`/api/initiatives/${id}`);
     const ws = await loadLastFourWeeksIncludingCurrent(api);
     const ids = ws.map((w) => w.id).join(',');
-    const act = ids
-      ? await api(`/api/activity?week_ids=${ids}`)
-      : [];
+    const act = ids ? await api(`/api/activity?week_ids=${ids}`) : [];
     const map = new Map();
     for (const row of act) {
       if (String(row.initiative_id) === String(id)) {
@@ -67,7 +65,6 @@ export default function InitiativeDetailPage() {
         initiative_id: initiative.id,
         week_id: currentWeek.id,
         worked_on: nextWorked,
-        updated_by_username: user.username,
         updated_at: new Date().toISOString(),
       })
     );
@@ -127,9 +124,7 @@ export default function InitiativeDetailPage() {
           {initiative.name}
         </h1>
         <div className="muted" style={{ fontSize: 11, marginBottom: 22 }}>
-          {(initiative.owner_username || '—') +
-            ' · ' +
-            (initiative.theme_name || '—')}
+          {(initiative.owner || '—') + ' · ' + (initiative.theme_name || '—')}
         </div>
 
         {currentWeek ? (
@@ -159,9 +154,7 @@ export default function InitiativeDetailPage() {
               <input
                 type="checkbox"
                 checked={Boolean(
-                  activityByKey.get(
-                    activityKey(initiative.id, currentWeek.id)
-                  )?.worked_on
+                  activityByKey.get(activityKey(initiative.id, currentWeek.id))?.worked_on
                 )}
                 disabled={completed || busy}
                 onChange={toggleCurrent}
@@ -172,7 +165,7 @@ export default function InitiativeDetailPage() {
         ) : null}
 
         <div className="eyebrow" style={{ marginBottom: 8 }}>
-          Last 4 weeks
+          Recent activity
         </div>
         <div
           className="content-wrap"
@@ -214,10 +207,7 @@ export default function InitiativeDetailPage() {
           style={{ padding: '12px 14px', fontSize: 11, color: 'var(--ink-muted)' }}
         >
           {lastUpdated ? (
-            <>
-              Last updated by {lastUpdated.updated_by_username || '—'} ·{' '}
-              {formatUSDateTime(lastUpdated.updated_at)}
-            </>
+            <>Last updated · {formatUSDateTime(lastUpdated.updated_at)}</>
           ) : (
             <>No activity logged yet for these weeks.</>
           )}

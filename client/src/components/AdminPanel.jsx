@@ -1,29 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useAuth } from '../contexts/AuthContext.jsx';
+import { useApi } from '../contexts/ApiContext.jsx';
 import { useAdminPanel } from '../contexts/AdminPanelContext.jsx';
 
 export default function AdminPanel({ onChanged }) {
-  const { api, user, publicMode } = useAuth();
+  const { api } = useApi();
   const { open, setOpen, tab, setTab } = useAdminPanel();
-  /** Ignore backdrop closes for a few ms after open (avoids same gesture closing the panel). */
   const panelOpenedAtRef = useRef(0);
-  const [users, setUsers] = useState([]);
   const [themes, setThemes] = useState([]);
   const [initiatives, setInitiatives] = useState([]);
   const [error, setError] = useState('');
   const [addingTheme, setAddingTheme] = useState('');
-  const [showUserForm, setShowUserForm] = useState(false);
-  const [userDraft, setUserDraft] = useState({
-    username: '',
-    password: '',
-    role: 'member',
-  });
   const [showIniForm, setShowIniForm] = useState(false);
   const [iniDraft, setIniDraft] = useState({
     id: null,
     name: '',
     theme_id: '',
-    owner_id: '',
+    owner: '',
     landing_page_url: '',
     status: 'active',
   });
@@ -31,12 +23,7 @@ export default function AdminPanel({ onChanged }) {
   const refresh = useCallback(async () => {
     setError('');
     try {
-      const [u, t, i] = await Promise.all([
-        api('/api/users'),
-        api('/api/themes'),
-        api('/api/initiatives'),
-      ]);
-      setUsers(Array.isArray(u) ? u : []);
+      const [t, i] = await Promise.all([api('/api/themes'), api('/api/initiatives')]);
       setThemes(Array.isArray(t) ? t : []);
       setInitiatives(Array.isArray(i) ? i : []);
     } catch (e) {
@@ -57,37 +44,9 @@ export default function AdminPanel({ onChanged }) {
   const activeInis = initiatives.filter((x) => x.status === 'active');
   const doneInis = initiatives.filter((x) => x.status === 'completed');
 
-  const themeSelectValue = themes.some(
-    (th) => String(th.id) === String(iniDraft.theme_id)
-  )
+  const themeSelectValue = themes.some((th) => String(th.id) === String(iniDraft.theme_id))
     ? String(iniDraft.theme_id)
     : '';
-  const ownerSelectValue = users.some(
-    (u) => String(u.id) === String(iniDraft.owner_id)
-  )
-    ? String(iniDraft.owner_id)
-    : '';
-
-  async function submitUser(e) {
-    e.preventDefault();
-    setError('');
-    try {
-      await api('/api/users', {
-        method: 'POST',
-        body: {
-          username: userDraft.username,
-          password: userDraft.password,
-          role: userDraft.role,
-        },
-      });
-      setShowUserForm(false);
-      setUserDraft({ username: '', password: '', role: 'member' });
-      await refresh();
-      onChanged?.();
-    } catch (err) {
-      setError(err.message);
-    }
-  }
 
   async function submitIni(e) {
     e.preventDefault();
@@ -96,7 +55,7 @@ export default function AdminPanel({ onChanged }) {
       const body = {
         name: iniDraft.name,
         theme_id: Number(iniDraft.theme_id),
-        owner_id: Number(iniDraft.owner_id),
+        owner: iniDraft.owner.trim(),
         landing_page_url: iniDraft.landing_page_url || null,
       };
       if (iniDraft.id) {
@@ -115,7 +74,7 @@ export default function AdminPanel({ onChanged }) {
         id: null,
         name: '',
         theme_id: '',
-        owner_id: '',
+        owner: '',
         landing_page_url: '',
         status: 'active',
       });
@@ -150,7 +109,7 @@ export default function AdminPanel({ onChanged }) {
         style={{
           position: 'fixed',
           inset: 0,
-          background: 'rgba(26,25,22,0.25)',
+          background: 'rgba(26,25,22,0.3)',
           zIndex: 40,
         }}
         onClick={() => {
@@ -202,7 +161,7 @@ export default function AdminPanel({ onChanged }) {
             padding: '0 12px',
           }}
         >
-          {['initiatives', 'users', 'themes'].map((t) => (
+          {['initiatives', 'themes'].map((t) => (
             <button
               key={t}
               type="button"
@@ -229,145 +188,6 @@ export default function AdminPanel({ onChanged }) {
         <div style={{ flex: 1, overflow: 'auto', padding: '14px 16px 24px' }}>
           {error ? (
             <p style={{ color: 'var(--red)', fontSize: 11 }}>{error}</p>
-          ) : null}
-
-          {tab === 'users' ? (
-            <div>
-              {users.map((u) => (
-                <div
-                  key={u.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '10px 0',
-                    borderBottom: '0.5px solid var(--rule)',
-                  }}
-                >
-                  <div>
-                    <div style={{ fontSize: 12, color: 'var(--ink)' }}>
-                      {u.username}
-                    </div>
-                    <span
-                      className={
-                        u.role === 'admin' ? 'badge badge-blue' : 'badge badge-muted'
-                      }
-                    >
-                      {u.role}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    <button
-                      type="button"
-                      className="btn-link"
-                      onClick={() => {
-                        const pw = window.prompt('New password (leave empty to keep)');
-                        const un = window.prompt('Username', u.username);
-                        if (un == null) return;
-                        const role =
-                          window.prompt('Role (admin/member)', u.role) || u.role;
-                        api(`/api/users/${u.id}`, {
-                          method: 'PUT',
-                          body: {
-                            username: un,
-                            ...(pw ? { password: pw } : {}),
-                            role: role === 'admin' ? 'admin' : 'member',
-                          },
-                        })
-                          .then(refresh)
-                          .then(() => onChanged?.())
-                          .catch((err) => setError(err.message));
-                      }}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-link danger"
-                      disabled={!publicMode && u.id === user.id}
-                      style={{
-                        opacity: !publicMode && u.id === user.id ? 0.35 : 1,
-                        cursor:
-                          !publicMode && u.id === user.id ? 'not-allowed' : 'pointer',
-                      }}
-                      onClick={() => {
-                        if (!publicMode && u.id === user.id) return;
-                        if (!window.confirm(`Remove ${u.username}?`)) return;
-                        api(`/api/users/${u.id}`, { method: 'DELETE' })
-                          .then(refresh)
-                          .then(() => onChanged?.())
-                          .catch((err) => setError(err.message));
-                      }}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-              ))}
-              {!showUserForm ? (
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  style={{
-                    width: '100%',
-                    marginTop: 16,
-                    borderStyle: 'dashed',
-                  }}
-                  onClick={() => setShowUserForm(true)}
-                >
-                  + Add user
-                </button>
-              ) : (
-                <form onSubmit={submitUser} style={{ marginTop: 16 }}>
-                  <div className="eyebrow" style={{ marginBottom: 6 }}>
-                    Username
-                  </div>
-                  <input
-                    className="input"
-                    value={userDraft.username}
-                    onChange={(e) =>
-                      setUserDraft((d) => ({ ...d, username: e.target.value }))
-                    }
-                  />
-                  <div className="eyebrow" style={{ margin: '12px 0 6px' }}>
-                    Password
-                  </div>
-                  <input
-                    className="input"
-                    type="password"
-                    value={userDraft.password}
-                    onChange={(e) =>
-                      setUserDraft((d) => ({ ...d, password: e.target.value }))
-                    }
-                  />
-                  <div className="eyebrow" style={{ margin: '12px 0 6px' }}>
-                    Role
-                  </div>
-                  <select
-                    className="select"
-                    value={userDraft.role}
-                    onChange={(e) =>
-                      setUserDraft((d) => ({ ...d, role: e.target.value }))
-                    }
-                  >
-                    <option value="member">member</option>
-                    <option value="admin">admin</option>
-                  </select>
-                  <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
-                    <button type="submit" className="btn-primary">
-                      Save
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-link"
-                      onClick={() => setShowUserForm(false)}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </form>
-              )}
-            </div>
           ) : null}
 
           {tab === 'themes' ? (
@@ -436,9 +256,7 @@ export default function AdminPanel({ onChanged }) {
                   <input
                     className="input"
                     value={iniDraft.name}
-                    onChange={(e) =>
-                      setIniDraft((d) => ({ ...d, name: e.target.value }))
-                    }
+                    onChange={(e) => setIniDraft((d) => ({ ...d, name: e.target.value }))}
                   />
                   <div className="eyebrow" style={{ margin: '12px 0 6px' }}>
                     Theme
@@ -466,20 +284,12 @@ export default function AdminPanel({ onChanged }) {
                   <div className="eyebrow" style={{ margin: '12px 0 6px' }}>
                     Owner
                   </div>
-                  <select
-                    className="select"
-                    value={ownerSelectValue}
-                    onChange={(e) =>
-                      setIniDraft((d) => ({ ...d, owner_id: e.target.value }))
-                    }
-                  >
-                    <option value="">Select owner</option>
-                    {users.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.username}
-                      </option>
-                    ))}
-                  </select>
+                  <input
+                    className="input"
+                    value={iniDraft.owner}
+                    onChange={(e) => setIniDraft((d) => ({ ...d, owner: e.target.value }))}
+                    placeholder="Name"
+                  />
                   <div className="eyebrow" style={{ margin: '12px 0 6px' }}>
                     Landing page URL (optional)
                   </div>
@@ -515,8 +325,8 @@ export default function AdminPanel({ onChanged }) {
                       type="submit"
                       className="btn-primary"
                       disabled={
-                        !iniDraft.name ||
-                        !ownerSelectValue ||
+                        !iniDraft.name.trim() ||
+                        !iniDraft.owner.trim() ||
                         themes.length === 0 ||
                         !themeSelectValue
                       }
@@ -532,7 +342,7 @@ export default function AdminPanel({ onChanged }) {
                           id: null,
                           name: '',
                           theme_id: '',
-                          owner_id: '',
+                          owner: '',
                           landing_page_url: '',
                           status: 'active',
                         });
@@ -563,11 +373,9 @@ export default function AdminPanel({ onChanged }) {
                     }}
                   >
                     <div>
-                      <div style={{ fontSize: 12, color: 'var(--ink)' }}>
-                        {i.name}
-                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--ink)' }}>{i.name}</div>
                       <div className="muted" style={{ fontSize: 10 }}>
-                        {(i.theme_name || '—') + ' · ' + (i.owner_username || '—')}
+                        {(i.theme_name || '—') + ' · ' + (i.owner || '—')}
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: 10 }}>
@@ -579,7 +387,7 @@ export default function AdminPanel({ onChanged }) {
                             id: i.id,
                             name: i.name,
                             theme_id: String(i.theme_id || ''),
-                            owner_id: String(i.owner_id || ''),
+                            owner: i.owner || '',
                             landing_page_url: i.landing_page_url || '',
                             status: i.status,
                           });
@@ -592,8 +400,7 @@ export default function AdminPanel({ onChanged }) {
                         type="button"
                         className="btn-link danger"
                         onClick={() => {
-                          if (!window.confirm(`Mark “${i.name}” completed?`))
-                            return;
+                          if (!window.confirm(`Mark “${i.name}” completed?`)) return;
                           api(`/api/initiatives/${i.id}`, {
                             method: 'PUT',
                             body: { status: 'completed' },
@@ -632,7 +439,7 @@ export default function AdminPanel({ onChanged }) {
                     <div>
                       <div style={{ fontSize: 12 }}>{i.name}</div>
                       <div className="muted" style={{ fontSize: 10 }}>
-                        {(i.theme_name || '—') + ' · ' + (i.owner_username || '—')}
+                        {(i.theme_name || '—') + ' · ' + (i.owner || '—')}
                       </div>
                     </div>
                     <button
@@ -668,7 +475,7 @@ export default function AdminPanel({ onChanged }) {
                       id: null,
                       name: '',
                       theme_id: themes[0]?.id ? String(themes[0].id) : '',
-                      owner_id: users[0]?.id ? String(users[0].id) : '',
+                      owner: '',
                       landing_page_url: '',
                       status: 'active',
                     });

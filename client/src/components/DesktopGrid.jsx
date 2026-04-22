@@ -155,7 +155,7 @@ export default function DesktopGrid({
                         </span>
                       )}
                       <div className="muted" style={{ fontSize: 10 }}>
-                        {ini.owner_username || '—'}
+                        {ini.owner || '—'}
                       </div>
                     </td>
                     {weeks.map((w) => {
@@ -183,7 +183,7 @@ export default function DesktopGrid({
                             setTip({
                               x: e.clientX,
                               y: e.clientY,
-                              text: `Updated by ${cell.updated_by_username || '—'} · ${formatUSDateTime(cell.updated_at)}`,
+                              text: `Last updated · ${formatUSDateTime(cell.updated_at)}`,
                             });
                           }}
                           onMouseMove={(e) => {
