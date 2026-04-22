@@ -1,5 +1,9 @@
-const base = () =>
-  (import.meta.env.VITE_API_URL || 'http://localhost:4000').replace(/\/$/, '');
+const base = () => {
+  if (import.meta.env.PROD) {
+    return '';
+  }
+  return (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+};
 
 function safeApiOrigin(root) {
   try {
@@ -12,8 +16,10 @@ function safeApiOrigin(root) {
 
 export async function apiRequest(path, { method = 'GET', body } = {}) {
   const root = base();
+  const url = root ? `${root}${path}` : path;
 
   if (
+    root &&
     typeof window !== 'undefined' &&
     window.location.protocol === 'https:' &&
     root.startsWith('http://') &&
@@ -21,7 +27,7 @@ export async function apiRequest(path, { method = 'GET', body } = {}) {
   ) {
     const origin = safeApiOrigin(root);
     throw new Error(
-      `API URL uses http:// (${origin.host}) but this page is https:// (mixed content). Set VITE_API_URL to your server https:// URL on Railway and redeploy the client.`
+      `API URL uses http:// (${origin.host}) but this page is https:// (mixed content). Set VITE_API_URL to your server https:// URL or use same-origin production build.`
     );
   }
 
@@ -33,7 +39,7 @@ export async function apiRequest(path, { method = 'GET', body } = {}) {
 
   let res;
   try {
-    res = await fetch(`${root}${path}`, {
+    res = await fetch(url, {
       method,
       headers,
       body: body != null ? JSON.stringify(body) : undefined,
@@ -42,7 +48,7 @@ export async function apiRequest(path, { method = 'GET', body } = {}) {
   } catch (e) {
     if (e?.name === 'AbortError') {
       throw new Error(
-        `Request timed out after ${timeoutMs / 1000}s — API may be unreachable. Check VITE_API_URL and that the server is up.`
+        `Request timed out after ${timeoutMs / 1000}s — API may be unreachable. In dev, set VITE_API_URL (e.g. http://localhost:4000) or use Vite proxy.`
       );
     }
     throw e;

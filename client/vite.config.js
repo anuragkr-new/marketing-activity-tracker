@@ -11,6 +11,12 @@ export default defineConfig(() => {
       host: '0.0.0.0',
       port: parseInt(process.env.PORT || '5173', 10),
       strictPort: Boolean(process.env.PORT),
+      proxy: {
+        '/api': {
+          target: 'http://127.0.0.1:4000',
+          changeOrigin: true,
+        },
+      },
       ...railwayHosts,
     },
     preview: {

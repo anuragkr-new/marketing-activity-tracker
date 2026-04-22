@@ -1,4 +1,6 @@
-require('dotenv').config({ path: require('path').join(__dirname, '..', 'server', '.env') });
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+require('dotenv').config({ path: path.join(__dirname, '..', 'server', '.env') });
 const { pool } = require('../server/db/pool');
 const { allMondaysOverlappingYear } = require('../server/lib/isoWeek');
 

@@ -1,10 +1,11 @@
-# Nixpacks already runs `npm ci` in the install phase. Do NOT add `npm ci` to the Railway
-# "Build Command" — a second `npm ci` causes EBUSY on node_modules/.cache.
-#
-# This phase runs only the Vite client build after install.
-# Server/API service: in Railway set Build Command to `true` (skip) if you do not want
-# the client bundle built into that image.
+# Single Railway service: install deps, build client, run Express (API + static SPA).
+
+[phases.install]
+cmds = ['npm ci']
 
 [phases.build]
 dependsOn = ['install']
-cmds = ['node scripts/railway-build-client.mjs']
+cmds = ['npm run build']
+
+[start]
+cmd = 'npm start'

@@ -1,13 +1,12 @@
-# Monorepo: do NOT set a global startCommand here — it would apply to every Railway
-# service from this repo and force the API on the client (browser shows "Cannot GET /").
-#
-# In the Railway dashboard, set per service:
-# - API:  Start = npm run start:server   |  Variables: DATABASE_URL, CLIENT_ORIGINS
-#         Build = `true` (skip) — avoids running the client Vite build on the server image
-#         Optional: Health check path = /api/health
-# - Client: Build = npm run build -w client   (NOT "npm ci && …" — install already ran; duplicate npm ci causes EBUSY)
-#           Start = npm run start -w client
-#           Variables (build-time): VITE_API_URL, VITE_ADMIN_PIN
+# One Railway service: Node serves /api/* and the built React app from client/dist.
+# Variables: DATABASE_URL (Postgres), VITE_ADMIN_PIN (at build time for client bundle).
+# After first deploy: run `npm run db:setup` once in a Railway shell.
 
 [build]
 builder = "NIXPACKS"
+
+[deploy]
+startCommand = "npm start"
+healthcheckPath = "/api/health"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
