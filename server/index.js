@@ -10,6 +10,7 @@ const themesRoutes = require('./routes/themes');
 const initiativesRoutes = require('./routes/initiatives');
 const weeksRoutes = require('./routes/weeks');
 const activityRoutes = require('./routes/activity');
+const { pool } = require('./db/pool');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 4000;
@@ -23,7 +24,28 @@ app.use(
 );
 app.use(express.json());
 
-app.get('/api/health', (_req, res) => res.json({ ok: true }));
+app.get('/api/health', async (_req, res) => {
+  if (!process.env.DATABASE_URL) {
+    return res.status(503).json({ ok: false, reason: 'missing_database_url' });
+  }
+  try {
+    const client = await pool.connect();
+    try {
+      await client.query('SELECT 1');
+    } finally {
+      client.release();
+    }
+    return res.json({ ok: true, db: true });
+  } catch (e) {
+    return res.status(503).json({
+      ok: false,
+      reason: 'database_unavailable',
+      ...(process.env.EXPOSE_ERROR_MESSAGE === 'true'
+        ? { error: e?.message || String(e) }
+        : {}),
+    });
+  }
+});
 
 app.use('/api/themes', themesRoutes);
 app.use('/api/initiatives', initiativesRoutes);
@@ -52,35 +74,14 @@ app.use((err, req, res, _next) => {
     return res.status(400).json({ error: err.errors?.[0]?.message || 'Validation error' });
   }
 
-  // #region agent log
-  const payload = {
-    sessionId: 'a9573c',
-    hypothesisId: 'ERR',
-    location: 'server/index.js:errorHandler',
-    message: err?.message || String(err),
-    data: {
-      name: err?.name,
-      code: err?.code,
-      path: req.path,
-      method: req.method,
-    },
-    timestamp: Date.now(),
-  };
-  const line = JSON.stringify(payload);
-  console.error('[AGENT_DEBUG]', line);
-  try {
-    fs.appendFileSync(path.join(__dirname, '..', '.cursor', 'debug-a9573c.log'), `${line}\n`);
-  } catch {
-    /* ignore */
-  }
-  fetch('http://127.0.0.1:7904/ingest/5b45e50a-8745-4974-be29-ba0dbafe7bcf', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'a9573c' },
-    body: line,
-  }).catch(() => {});
-  // #endregion
-
+  console.error('[api-error]', {
+    method: req.method,
+    path: req.path,
+    code: err?.code,
+    message: err?.message,
+  });
   console.error(err);
+
   const expose =
     process.env.EXPOSE_ERROR_MESSAGE === 'true' || process.env.NODE_ENV !== 'production';
   res.status(500).json({
@@ -91,6 +92,9 @@ app.use((err, req, res, _next) => {
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server listening on http://0.0.0.0:${PORT}`);
+  if (!process.env.DATABASE_URL) {
+    console.error('DATABASE_URL is not set — /api routes that use Postgres will fail.');
+  }
   if (!fs.existsSync(indexHtml)) {
     console.warn(
       'client/dist/index.html missing — run `npm run build` from repo root before production.'
