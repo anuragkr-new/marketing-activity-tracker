@@ -1,10 +1,8 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
 
 export default function LoginPage() {
   const { login } = useAuth();
-  const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -14,9 +12,16 @@ export default function LoginPage() {
     setError('');
     try {
       await login(username, password);
-      navigate('/', { replace: true });
+      // Full navigation avoids a race where `navigate('/')` runs before
+      // AuthProvider state updates and `RequireAuth` bounces back to /login.
+      window.location.replace('/');
     } catch (err) {
-      setError(err.message || 'Sign in failed');
+      const msg = err.message || 'Sign in failed';
+      setError(
+        msg === 'Failed to fetch'
+          ? `${msg} — check the API URL (VITE_API_URL must be https:// when the app is on https://) and CORS (CLIENT_ORIGIN on the server).`
+          : msg
+      );
     }
   }
 
