@@ -65,7 +65,7 @@ async function resolveOwnerId() {
   );
   const { rows } = await pool.query(
     `SELECT id FROM owners
-     WHERE lower(trim(name)) = lower(trim($1::text))
+     WHERE lower(btrim(name::text)) = lower(btrim($1::text))
      LIMIT 1`,
     [DEFAULT_OWNER_NAME]
   );
@@ -76,7 +76,7 @@ async function resolveOwnerId() {
 async function resolveThemeId(themeName) {
   const { rows } = await pool.query(
     `SELECT id FROM themes
-     WHERE lower(trim(name)) = lower(trim($1::text))
+     WHERE lower(btrim(name::text)) = lower(btrim($1::text))
      LIMIT 1`,
     [themeName]
   );
@@ -117,9 +117,10 @@ async function ensureMarketingInitiatives() {
     }
     const ins = await pool.query(
       `INSERT INTO initiatives (name, theme_id, owner_id, landing_page_url, status)
-       SELECT $1, $2, $3, NULL, 'active'
+       SELECT $1::varchar(255), $2::integer, $3::integer, NULL, 'active'
        WHERE NOT EXISTS (
-         SELECT 1 FROM initiatives i WHERE i.theme_id = $2 AND i.name = $1
+         SELECT 1 FROM initiatives i
+         WHERE i.theme_id = $2::integer AND i.name = $1::varchar(255)
        )
        RETURNING id`,
       [name, themeId, ownerId]
