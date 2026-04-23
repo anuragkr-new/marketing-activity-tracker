@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { formatUS, isDateInWeekRange, formatUSDateTime } from '../utils/dates.js';
+import ActivityCellInput from './ActivityCellInput.jsx';
 
 function activityKey(initiativeId, weekId) {
   return `${initiativeId}_${weekId}`;
@@ -22,7 +23,7 @@ export default function DesktopGrid({
   initiatives,
   weeks,
   activityByKey,
-  onToggle,
+  onCellSave,
   offset,
   setOffset,
   busyKey,
@@ -85,7 +86,7 @@ export default function DesktopGrid({
                     background: current ? 'var(--blue-tint)' : 'var(--surface)',
                     textAlign: 'center',
                     whiteSpace: 'nowrap',
-                    minWidth: 88,
+                    minWidth: 120,
                   }}
                 >
                   <div>
@@ -161,25 +162,22 @@ export default function DesktopGrid({
                     {weeks.map((w) => {
                       const key = activityKey(ini.id, w.id);
                       const cell = activityByKey.get(key);
-                      const worked = Boolean(cell?.worked_on);
                       const loading = busyKey === key;
+                      const hasText = Boolean((cell?.cell_text || '').trim());
                       return (
                         <td
                           key={w.id}
                           className="activity-cell"
                           style={{
                             textAlign: 'center',
-                            background: worked ? 'var(--teal-tint)' : 'var(--warm)',
+                            verticalAlign: 'middle',
+                            background: hasText ? 'var(--teal-tint)' : 'var(--warm)',
                             opacity: completed ? 0.35 : 1,
-                            cursor: completed || loading ? 'default' : 'pointer',
                             position: 'relative',
-                          }}
-                          onClick={() => {
-                            if (completed || loading) return;
-                            onToggle(ini.id, w.id, key);
+                            padding: '4px 6px',
                           }}
                           onMouseEnter={(e) => {
-                            if (!worked || !cell) return;
+                            if (!cell?.updated_at) return;
                             setTip({
                               x: e.clientX,
                               y: e.clientY,
@@ -187,7 +185,7 @@ export default function DesktopGrid({
                             });
                           }}
                           onMouseMove={(e) => {
-                            if (!worked || !cell) return;
+                            if (!cell?.updated_at) return;
                             setTip((t) =>
                               t
                                 ? {
@@ -200,33 +198,14 @@ export default function DesktopGrid({
                           }}
                           onMouseLeave={() => setTip(null)}
                         >
-                          <div
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              minHeight: 28,
-                              minWidth: 36,
-                              borderRadius: 4,
-                            }}
-                          >
-                            {worked ? (
-                              <span
-                                style={{
-                                  width: 10,
-                                  height: 10,
-                                  borderRadius: '50%',
-                                  background: 'var(--teal)',
-                                  display: 'inline-block',
-                                }}
-                              />
-                            ) : null}
-                          </div>
-                          {loading ? (
-                            <span className="muted" style={{ fontSize: 9 }}>
-                              …
-                            </span>
-                          ) : null}
+                          <ActivityCellInput
+                            initiativeId={ini.id}
+                            weekId={w.id}
+                            cell={cell}
+                            disabled={completed}
+                            busy={loading}
+                            onSave={onCellSave}
+                          />
                         </td>
                       );
                     })}
@@ -265,47 +244,9 @@ export default function DesktopGrid({
           flexWrap: 'wrap',
         }}
       >
-        <span>
-          <span
-            style={{
-              display: 'inline-block',
-              width: 8,
-              height: 8,
-              borderRadius: '50%',
-              background: 'var(--teal)',
-              marginRight: 8,
-              verticalAlign: 'middle',
-            }}
-          />
-          Worked on
-        </span>
-        <span>
-          <span
-            style={{
-              display: 'inline-block',
-              width: 8,
-              height: 8,
-              borderRadius: '50%',
-              border: '1px solid var(--ink-muted)',
-              marginRight: 8,
-              verticalAlign: 'middle',
-            }}
-          />
-          Not worked on
-        </span>
+        <span>Cells are free text; changes save when you leave the field.</span>
         <span style={{ opacity: 0.45 }}>
-          <span
-            style={{
-              display: 'inline-block',
-              width: 8,
-              height: 8,
-              borderRadius: '50%',
-              border: '1px solid var(--ink-muted)',
-              marginRight: 8,
-              verticalAlign: 'middle',
-            }}
-          />
-          Completed / inactive
+          Completed initiatives are read-only in the grid.
         </span>
       </div>
     </div>

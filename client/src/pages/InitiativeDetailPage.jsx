@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useApi } from '../contexts/ApiContext.jsx';
 import { formatUS, formatUSDateTime, isDateInWeekRange } from '../utils/dates.js';
 import { loadLastFourWeeksIncludingCurrent } from '../utils/weeksClient.js';
+import ActivityCellInput from '../components/ActivityCellInput.jsx';
 
 function activityKey(initiativeId, weekId) {
   return `${initiativeId}_${weekId}`;
@@ -15,7 +16,7 @@ export default function InitiativeDetailPage() {
   const [initiative, setInitiative] = useState(null);
   const [weeks, setWeeks] = useState([]);
   const [activityByKey, setActivityByKey] = useState(() => new Map());
-  const [busy, setBusy] = useState(false);
+  const [busyWeekId, setBusyWeekId] = useState(null);
 
   const load = useCallback(async () => {
     const ini = await api(`/api/initiatives/${id}`);
@@ -52,28 +53,28 @@ export default function InitiativeDetailPage() {
     return max?.row || null;
   }, [activityByKey]);
 
-  async function toggleCurrent() {
-    if (!currentWeek || !initiative) return;
+  async function handleCellSave(initiativeId, weekId, cell_text) {
+    if (!initiative) return;
     if (initiative.status === 'completed') return;
-    const key = activityKey(initiative.id, currentWeek.id);
-    setBusy(true);
+    const key = activityKey(initiativeId, weekId);
+    setBusyWeekId(weekId);
     const prev = activityByKey.get(key);
-    const nextWorked = prev ? !prev.worked_on : true;
     setActivityByKey((m) =>
       new Map(m).set(key, {
         ...(prev || {}),
-        initiative_id: initiative.id,
-        week_id: currentWeek.id,
-        worked_on: nextWorked,
+        initiative_id: initiativeId,
+        week_id: weekId,
+        cell_text,
         updated_at: new Date().toISOString(),
       })
     );
     try {
-      const row = await api('/api/activity/toggle', {
+      const row = await api('/api/activity', {
         method: 'POST',
         body: {
-          initiative_id: initiative.id,
-          week_id: currentWeek.id,
+          initiative_id: initiativeId,
+          week_id: weekId,
+          cell_text,
         },
       });
       setActivityByKey((m) => new Map(m).set(key, row));
@@ -85,7 +86,7 @@ export default function InitiativeDetailPage() {
         return n;
       });
     } finally {
-      setBusy(false);
+      setBusyWeekId(null);
     }
   }
 
@@ -130,42 +131,32 @@ export default function InitiativeDetailPage() {
         {currentWeek ? (
           <div
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
               marginBottom: 18,
               padding: '10px 12px',
               border: '1px solid var(--rule)',
               background: 'var(--surface)',
             }}
           >
-            <div>
-              <div className="eyebrow">This week</div>
-              <div style={{ fontSize: 12 }}>
-                W{currentWeek.week_number} · {formatUS(currentWeek.start_date)}
-              </div>
+            <div className="eyebrow" style={{ marginBottom: 8 }}>
+              This week
             </div>
-            <label
-              style={{
-                opacity: completed ? 0.35 : 1,
-                pointerEvents: completed ? 'none' : 'auto',
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={Boolean(
-                  activityByKey.get(activityKey(initiative.id, currentWeek.id))?.worked_on
-                )}
-                disabled={completed || busy}
-                onChange={toggleCurrent}
-                style={{ accentColor: 'var(--teal)', width: 20, height: 20 }}
-              />
-            </label>
+            <div style={{ fontSize: 12, marginBottom: 10 }}>
+              W{currentWeek.week_number} · {formatUS(currentWeek.start_date)}
+            </div>
+            <ActivityCellInput
+              initiativeId={initiative.id}
+              weekId={currentWeek.id}
+              cell={activityByKey.get(activityKey(initiative.id, currentWeek.id))}
+              disabled={completed}
+              busy={busyWeekId === currentWeek.id}
+              onSave={handleCellSave}
+              inputStyle={{ maxWidth: '100%', margin: 0 }}
+            />
           </div>
         ) : null}
 
         <div className="eyebrow" style={{ marginBottom: 8 }}>
-          Recent activity
+          Recent weeks
         </div>
         <div
           className="content-wrap"
@@ -173,7 +164,6 @@ export default function InitiativeDetailPage() {
         >
           {weeks.map((w) => {
             const key = activityKey(initiative.id, w.id);
-            const on = Boolean(activityByKey.get(key)?.worked_on);
             return (
               <div
                 key={w.id}
@@ -181,22 +171,25 @@ export default function InitiativeDetailPage() {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
+                  gap: 12,
                   padding: '10px 14px',
                   borderBottom: '0.5px solid var(--rule)',
                 }}
               >
-                <div style={{ fontSize: 12 }}>
+                <div style={{ fontSize: 12, flexShrink: 0 }}>
                   W{w.week_number} · {formatUS(w.start_date)}
                 </div>
-                <span
-                  style={{
-                    width: 10,
-                    height: 10,
-                    borderRadius: '50%',
-                    background: on ? 'var(--teal)' : 'transparent',
-                    border: on ? 'none' : '1px solid var(--ink-muted)',
-                  }}
-                />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <ActivityCellInput
+                    initiativeId={initiative.id}
+                    weekId={w.id}
+                    cell={activityByKey.get(key)}
+                    disabled={completed}
+                    busy={busyWeekId === w.id}
+                    onSave={handleCellSave}
+                    inputStyle={{ maxWidth: '100%', margin: 0 }}
+                  />
+                </div>
               </div>
             );
           })}
@@ -209,7 +202,7 @@ export default function InitiativeDetailPage() {
           {lastUpdated ? (
             <>Last updated · {formatUSDateTime(lastUpdated.updated_at)}</>
           ) : (
-            <>No activity logged yet for these weeks.</>
+            <>No entries yet for these weeks.</>
           )}
         </div>
       </main>

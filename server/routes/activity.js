@@ -17,7 +17,7 @@ router.get('/', async (req, res) => {
     return res.json([]);
   }
   const { rows } = await pool.query(
-    `SELECT a.id, a.initiative_id, a.week_id, a.worked_on, a.updated_at
+    `SELECT a.id, a.initiative_id, a.week_id, a.cell_text, a.updated_at
      FROM activity_log a
      WHERE a.week_id = ANY($1::int[])
      ORDER BY a.initiative_id, a.week_id`,
@@ -26,13 +26,16 @@ router.get('/', async (req, res) => {
   res.json(rows);
 });
 
-router.post('/toggle', async (req, res) => {
+router.post('/', async (req, res) => {
   const body = z
     .object({
       initiative_id: z.number().int().positive(),
       week_id: z.number().int().positive(),
+      cell_text: z.string().max(8000).optional().default(''),
     })
     .parse(req.body);
+
+  const text = body.cell_text.trim();
 
   const ini = await pool.query('SELECT id, status FROM initiatives WHERE id = $1', [
     body.initiative_id,
@@ -44,41 +47,15 @@ router.post('/toggle', async (req, res) => {
     return res.status(403).json({ error: 'Initiative is completed' });
   }
 
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    const existing = await client.query(
-      `SELECT id, worked_on FROM activity_log
-       WHERE initiative_id = $1 AND week_id = $2 FOR UPDATE`,
-      [body.initiative_id, body.week_id]
-    );
-    let row;
-    if (!existing.rows[0]) {
-      const ins = await client.query(
-        `INSERT INTO activity_log (initiative_id, week_id, worked_on, updated_at)
-         VALUES ($1, $2, true, NOW())
-         RETURNING id, initiative_id, week_id, worked_on, updated_at`,
-        [body.initiative_id, body.week_id]
-      );
-      row = ins.rows[0];
-    } else {
-      const upd = await client.query(
-        `UPDATE activity_log
-         SET worked_on = NOT worked_on, updated_at = NOW()
-         WHERE initiative_id = $1 AND week_id = $2
-         RETURNING id, initiative_id, week_id, worked_on, updated_at`,
-        [body.initiative_id, body.week_id]
-      );
-      row = upd.rows[0];
-    }
-    await client.query('COMMIT');
-    res.json(row);
-  } catch (e) {
-    await client.query('ROLLBACK');
-    throw e;
-  } finally {
-    client.release();
-  }
+  const { rows } = await pool.query(
+    `INSERT INTO activity_log (initiative_id, week_id, cell_text, updated_at)
+     VALUES ($1, $2, $3, NOW())
+     ON CONFLICT (initiative_id, week_id)
+     DO UPDATE SET cell_text = EXCLUDED.cell_text, updated_at = NOW()
+     RETURNING id, initiative_id, week_id, cell_text, updated_at`,
+    [body.initiative_id, body.week_id, text]
+  );
+  res.json(rows[0]);
 });
 
 module.exports = router;

@@ -101,10 +101,22 @@ CREATE TABLE IF NOT EXISTS activity_log (
   id SERIAL PRIMARY KEY,
   initiative_id INTEGER REFERENCES initiatives(id),
   week_id INTEGER REFERENCES weeks(id),
-  worked_on BOOLEAN NOT NULL DEFAULT FALSE,
+  cell_text TEXT NOT NULL DEFAULT '',
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(initiative_id, week_id)
 );
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'activity_log' AND column_name = 'worked_on'
+  ) THEN
+    ALTER TABLE activity_log ADD COLUMN IF NOT EXISTS cell_text TEXT NOT NULL DEFAULT '';
+    UPDATE activity_log SET cell_text = 'Yes' WHERE worked_on IS TRUE;
+    ALTER TABLE activity_log DROP COLUMN worked_on;
+  END IF;
+END $$;
 
 ALTER TABLE activity_log DROP CONSTRAINT IF EXISTS activity_log_updated_by_fkey;
 ALTER TABLE activity_log DROP COLUMN IF EXISTS updated_by;

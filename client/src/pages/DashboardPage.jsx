@@ -59,22 +59,22 @@ export default function DashboardPage() {
     return weeks[0] || null;
   }, [currentWeekMeta.week, weeks]);
 
-  async function handleToggle(initiativeId, weekId, key) {
+  async function handleCellSave(initiativeId, weekId, cell_text) {
+    const key = activityKey(initiativeId, weekId);
     setBusyKey(key);
     const prev = activityByKey.get(key);
-    const nextWorked = prev ? !prev.worked_on : true;
     const optimistic = {
       ...(prev || {}),
       initiative_id: initiativeId,
       week_id: weekId,
-      worked_on: nextWorked,
+      cell_text,
       updated_at: new Date().toISOString(),
     };
     setActivityByKey((m) => new Map(m).set(key, optimistic));
     try {
-      const row = await api('/api/activity/toggle', {
+      const row = await api('/api/activity', {
         method: 'POST',
-        body: { initiative_id: initiativeId, week_id: weekId },
+        body: { initiative_id: initiativeId, week_id: weekId, cell_text },
       });
       setActivityByKey((m) => new Map(m).set(key, row));
     } catch {
@@ -127,7 +127,7 @@ export default function DashboardPage() {
               initiatives={initiatives}
               currentWeek={currentWeekForMobile}
               activityByKey={activityByKey}
-              onToggle={handleToggle}
+              onCellSave={handleCellSave}
               busyKey={busyKey}
             />
           ) : (
@@ -135,7 +135,7 @@ export default function DashboardPage() {
               initiatives={initiatives}
               weeks={weeks}
               activityByKey={activityByKey}
-              onToggle={handleToggle}
+              onCellSave={handleCellSave}
               offset={offset}
               setOffset={setOffset}
               busyKey={busyKey}

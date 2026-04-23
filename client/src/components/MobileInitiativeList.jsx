@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { weekRangeLabel } from '../utils/dates.js';
+import ActivityCellInput from './ActivityCellInput.jsx';
 
 function groupInitiatives(rows) {
   const map = new Map();
@@ -23,7 +24,7 @@ export default function MobileInitiativeList({
   initiatives,
   currentWeek,
   activityByKey,
-  onToggle,
+  onCellSave,
   busyKey,
 }) {
   const navigate = useNavigate();
@@ -58,7 +59,6 @@ export default function MobileInitiativeList({
             const completed = ini.status === 'completed';
             const key = activityKey(ini.id, currentWeek.id);
             const cell = activityByKey.get(key);
-            const on = Boolean(cell?.worked_on);
             const loading = busyKey === key;
             return (
               <div
@@ -88,26 +88,22 @@ export default function MobileInitiativeList({
                     {ini.owner || '—'}
                   </div>
                 </button>
-                <label
+                <div
                   style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 8,
+                    flex: '0 0 min(42%, 160px)',
                     opacity: completed ? 0.35 : 1,
                     pointerEvents: completed ? 'none' : 'auto',
                   }}
                 >
-                  <input
-                    type="checkbox"
-                    checked={on}
-                    disabled={completed || loading}
-                    onChange={() => {
-                      if (completed || loading) return;
-                      onToggle(ini.id, currentWeek.id, key);
-                    }}
-                    style={{ accentColor: 'var(--teal)', width: 18, height: 18 }}
+                  <ActivityCellInput
+                    initiativeId={ini.id}
+                    weekId={currentWeek.id}
+                    cell={cell}
+                    disabled={completed}
+                    busy={loading}
+                    onSave={onCellSave}
                   />
-                </label>
+                </div>
               </div>
             );
           })}
