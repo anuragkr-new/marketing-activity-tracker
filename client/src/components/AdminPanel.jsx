@@ -96,6 +96,35 @@ export default function AdminPanel({ onChanged }) {
     }
   }
 
+  async function deleteInitiative(i) {
+    if (
+      !window.confirm(
+        `Permanently delete “${i.name}”? This removes all logged activity for this initiative.`
+      )
+    ) {
+      return;
+    }
+    setError('');
+    try {
+      await api(`/api/initiatives/${i.id}`, { method: 'DELETE' });
+      if (iniDraft.id === i.id) {
+        setShowIniForm(false);
+        setIniDraft({
+          id: null,
+          name: '',
+          theme_id: '',
+          owner_id: '',
+          landing_page_url: '',
+          status: 'active',
+        });
+      }
+      await refresh();
+      onChanged?.();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   async function addOwner(e) {
     e.preventDefault();
     if (!addingOwner.trim()) return;
@@ -511,6 +540,13 @@ export default function AdminPanel({ onChanged }) {
                       >
                         End
                       </button>
+                      <button
+                        type="button"
+                        className="btn-link danger"
+                        onClick={() => deleteInitiative(i)}
+                      >
+                        Delete
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -555,6 +591,13 @@ export default function AdminPanel({ onChanged }) {
                       }}
                     >
                       Restore
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-link danger"
+                      onClick={() => deleteInitiative(i)}
+                    >
+                      Delete
                     </button>
                   </div>
                 </div>
