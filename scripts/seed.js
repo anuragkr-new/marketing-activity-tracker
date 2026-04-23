@@ -58,30 +58,61 @@ const DEFAULT_INITIATIVES = [
 
 const DEFAULT_OWNER_NAME = 'Apoorv';
 
-async function ensureMarketingInitiatives() {
+async function resolveOwnerId() {
   await pool.query(
     `INSERT INTO owners (name) VALUES ($1) ON CONFLICT (name) DO NOTHING`,
     [DEFAULT_OWNER_NAME]
   );
-  const { rows: ownerRows } = await pool.query(
-    `SELECT id FROM owners WHERE name = $1`,
+  const { rows } = await pool.query(
+    `SELECT id FROM owners
+     WHERE lower(trim(name)) = lower(trim($1::text))
+     LIMIT 1`,
     [DEFAULT_OWNER_NAME]
   );
-  const ownerId = ownerRows[0]?.id;
+  return rows[0]?.id ?? null;
+}
+
+/** Match theme even if DB name differs only by case or outer spaces. */
+async function resolveThemeId(themeName) {
+  const { rows } = await pool.query(
+    `SELECT id FROM themes
+     WHERE lower(trim(name)) = lower(trim($1::text))
+     LIMIT 1`,
+    [themeName]
+  );
+  return rows[0]?.id ?? null;
+}
+
+async function ensureMarketingInitiatives() {
+  const ownerId = await resolveOwnerId();
   if (!ownerId) {
-    console.warn('Could not resolve owner id; skipping initiative seed.');
+    console.warn(
+      '[seed] Could not resolve owner id for "' +
+        DEFAULT_OWNER_NAME +
+        '"; skipping marketing initiatives. Check owners table and migrations.'
+    );
+    return;
+  }
+
+  const { rows: themeCount } = await pool.query(`SELECT COUNT(*)::int AS n FROM themes`);
+  if (!themeCount[0]?.n) {
+    console.warn(
+      '[seed] themes table is empty — run ensureThemes first (should run automatically in this script). Skipping initiatives.'
+    );
     return;
   }
 
   let inserted = 0;
-  let skipped = 0;
+  let skippedDuplicate = 0;
+  let skippedMissingTheme = 0;
+  const missingThemeLabels = new Set();
+
   for (const row of DEFAULT_INITIATIVES) {
     const name = row.name.length > 255 ? row.name.slice(0, 252) + '...' : row.name;
-    const { rows: th } = await pool.query(`SELECT id FROM themes WHERE name = $1`, [row.theme]);
-    const themeId = th[0]?.id;
+    const themeId = await resolveThemeId(row.theme);
     if (!themeId) {
-      console.warn(`Skipping initiative (missing theme): ${row.theme} — ${name}`);
-      skipped += 1;
+      missingThemeLabels.add(row.theme);
+      skippedMissingTheme += 1;
       continue;
     }
     const ins = await pool.query(
@@ -94,11 +125,23 @@ async function ensureMarketingInitiatives() {
       [name, themeId, ownerId]
     );
     if (ins.rowCount > 0) inserted += 1;
-    else skipped += 1;
+    else skippedDuplicate += 1;
   }
+
   console.log(
-    `Marketing initiatives: ${inserted} inserted, ${skipped} skipped (duplicate theme+name or missing theme).`
+    `[seed] Marketing initiatives: ${inserted} inserted, ${skippedDuplicate} already present (same theme+name), ${skippedMissingTheme} skipped (no matching theme).`
   );
+  if (missingThemeLabels.size > 0) {
+    console.warn(
+      '[seed] Themes in data but not found in DB (check spelling vs Manage → Themes): ' +
+        [...missingThemeLabels].join('; ')
+    );
+  }
+  if (inserted === 0 && skippedDuplicate === 0 && skippedMissingTheme > 0) {
+    console.warn(
+      '[seed] Tip: default theme names are inserted by ensureThemes() in this script. If you only ran `npm run migrate` without `npm run seed`, run `npm run seed` or `npm run db:setup`.'
+    );
+  }
 }
 
 async function ensureWeeks() {
