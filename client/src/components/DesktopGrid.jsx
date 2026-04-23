@@ -59,10 +59,7 @@ export default function DesktopGrid({
           →
         </button>
       </div>
-      <table
-        className="table-plain"
-        style={{ width: '100%', minWidth: 720, tableLayout: 'fixed' }}
-      >
+      <table className="table-plain" style={{ minWidth: 720 }}>
         <thead>
           <tr>
             <th
@@ -71,9 +68,7 @@ export default function DesktopGrid({
                 left: 0,
                 zIndex: 3,
                 background: 'var(--surface)',
-                width: '28%',
-                minWidth: 180,
-                maxWidth: 320,
+                minWidth: 200,
                 borderRight: '1px solid var(--rule)',
               }}
             >
@@ -91,8 +86,7 @@ export default function DesktopGrid({
                     background: current ? 'var(--blue-tint)' : 'var(--surface)',
                     textAlign: 'center',
                     whiteSpace: 'nowrap',
-                    width: `${72 / Math.max(weeks.length, 1)}%`,
-                    minWidth: 0,
+                    minWidth: 120,
                   }}
                 >
                   <div>
@@ -136,10 +130,6 @@ export default function DesktopGrid({
                         zIndex: 2,
                         background: 'var(--surface)',
                         borderRight: '1px solid var(--rule)',
-                        width: '28%',
-                        minWidth: 180,
-                        maxWidth: 320,
-                        boxSizing: 'border-box',
                       }}
                     >
                       {ini.landing_page_url ? (
@@ -184,9 +174,7 @@ export default function DesktopGrid({
                             background: hasText ? 'var(--teal-tint)' : 'var(--warm)',
                             opacity: completed ? 0.35 : 1,
                             position: 'relative',
-                            padding: '4px 4px',
-                            width: `${72 / Math.max(weeks.length, 1)}%`,
-                            minWidth: 0,
+                            padding: '4px 6px',
                           }}
                           onMouseEnter={(e) => {
                             if (!cell?.updated_at) return;

@@ -35,14 +35,14 @@ export default function ActivityCellInput({
       placeholder="—"
       style={{
         width: '100%',
-        minWidth: 0,
-        margin: 0,
+        minWidth: 64,
+        maxWidth: 140,
+        margin: '0 auto',
         display: 'block',
         fontSize: 11,
-        padding: '6px 8px',
+        padding: '4px 6px',
         textAlign: 'left',
         boxSizing: 'border-box',
-        borderRadius: 6,
         ...inputStyle,
       }}
     />
