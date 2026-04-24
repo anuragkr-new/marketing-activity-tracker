@@ -3,6 +3,7 @@ import { useApi } from '../contexts/ApiContext.jsx';
 import { useAdminPanel } from '../contexts/AdminPanelContext.jsx';
 import { useWindowWidth } from '../hooks/useWindowWidth.js';
 import { formatUS, isDateInWeekRange } from '../utils/dates.js';
+import { selectCurrentPlusThreeWeeks } from '../utils/planningWeeks.js';
 import DesktopGrid from '../components/DesktopGrid.jsx';
 import MobileInitiativeList from '../components/MobileInitiativeList.jsx';
 import AdminPanel from '../components/AdminPanel.jsx';
@@ -18,8 +19,10 @@ export default function DashboardPage() {
   const width = useWindowWidth();
   const isMobile = width < 768;
 
+  const [dashboardTab, setDashboardTab] = useState('full');
   const [offset, setOffset] = useState(0);
   const [weeks, setWeeks] = useState([]);
+  const [planningWeeks, setPlanningWeeks] = useState([]);
   const [initiatives, setInitiatives] = useState([]);
   const [activityByKey, setActivityByKey] = useState(() => new Map());
   const [busyKey, setBusyKey] = useState(null);
@@ -30,21 +33,46 @@ export default function DashboardPage() {
     const ini = await api('/api/initiatives');
     const ids = w.map((x) => x.id).join(',');
     const act = ids ? await api(`/api/activity?week_ids=${ids}`) : [];
-    const map = new Map();
-    for (const row of act) {
-      map.set(activityKey(row.initiative_id, row.week_id), row);
-    }
+    setActivityByKey((prev) => {
+      const n = new Map(prev);
+      for (const row of act) {
+        n.set(activityKey(row.initiative_id, row.week_id), row);
+      }
+      return n;
+    });
     setWeeks(w);
     setInitiatives(ini);
-    setActivityByKey(map);
   }, [api, offset, width]);
+
+  const loadPlanning = useCallback(async () => {
+    const w = await api('/api/weeks?offset=0');
+    const slice = selectCurrentPlusThreeWeeks(w);
+    setPlanningWeeks(slice);
+    const ids = slice.map((x) => x.id).join(',');
+    if (!ids) return;
+    const act = await api(`/api/activity?week_ids=${ids}`);
+    setActivityByKey((prev) => {
+      const n = new Map(prev);
+      for (const row of act) {
+        n.set(activityKey(row.initiative_id, row.week_id), row);
+      }
+      return n;
+    });
+  }, [api]);
 
   useEffect(() => {
     load().catch(() => {});
   }, [load]);
 
+  useEffect(() => {
+    if (isMobile || dashboardTab !== 'planning') return;
+    loadPlanning().catch(() => {});
+  }, [isMobile, dashboardTab, loadPlanning]);
+
   const currentWeekMeta = useMemo(() => {
-    const fromGrid = weeks.find((w) => isDateInWeekRange(w.start_date));
+    const pool =
+      dashboardTab === 'planning' && planningWeeks.length > 0 ? planningWeeks : weeks;
+    const fromGrid = pool.find((w) => isDateInWeekRange(w.start_date));
     if (fromGrid) {
       return {
         label: `W${fromGrid.week_number} · ${formatUS(fromGrid.start_date)}`,
@@ -52,7 +80,7 @@ export default function DashboardPage() {
       };
     }
     return { label: '', week: null };
-  }, [weeks]);
+  }, [weeks, planningWeeks, dashboardTab]);
 
   const currentWeekForMobile = useMemo(() => {
     if (currentWeekMeta.week) return currentWeekMeta.week;
@@ -89,6 +117,20 @@ export default function DashboardPage() {
     }
   }
 
+  function tabButtonStyle(active) {
+    return {
+      fontSize: 12,
+      padding: '6px 12px',
+      borderRadius: 6,
+      border: '1px solid var(--rule)',
+      background: active ? 'var(--surface)' : 'transparent',
+      color: 'var(--ink)',
+      fontWeight: active ? 600 : 400,
+      cursor: 'pointer',
+      boxShadow: active ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+    };
+  }
+
   return (
     <div style={{ minHeight: '100%', background: 'var(--page-bg)' }}>
       <header
@@ -118,6 +160,32 @@ export default function DashboardPage() {
       </header>
 
       <main style={{ padding: isMobile ? '12px 14px 32px' : '20px 24px 40px' }}>
+        {!isMobile ? (
+          <div
+            style={{
+              display: 'flex',
+              gap: 8,
+              marginBottom: 14,
+              paddingLeft: 2,
+            }}
+          >
+            <button
+              type="button"
+              style={tabButtonStyle(dashboardTab === 'full')}
+              onClick={() => setDashboardTab('full')}
+            >
+              Full grid
+            </button>
+            <button
+              type="button"
+              style={tabButtonStyle(dashboardTab === 'planning')}
+              onClick={() => setDashboardTab('planning')}
+            >
+              Next 4 weeks
+            </button>
+          </div>
+        ) : null}
+
         <div
           className="content-wrap"
           style={{ padding: isMobile ? '14px 12px' : '20px 22px' }}
@@ -130,14 +198,23 @@ export default function DashboardPage() {
               onCellSave={handleCellSave}
               busyKey={busyKey}
             />
-          ) : (
+          ) : dashboardTab === 'full' ? (
             <DesktopGrid
               initiatives={initiatives}
               weeks={weeks}
               activityByKey={activityByKey}
               onCellSave={handleCellSave}
-              offset={offset}
               setOffset={setOffset}
+              showOffsetControls
+              busyKey={busyKey}
+            />
+          ) : (
+            <DesktopGrid
+              initiatives={initiatives}
+              weeks={planningWeeks}
+              activityByKey={activityByKey}
+              onCellSave={handleCellSave}
+              showOffsetControls={false}
               busyKey={busyKey}
             />
           )}
@@ -148,6 +225,9 @@ export default function DashboardPage() {
       <AdminPanel
         onChanged={() => {
           load().catch(() => {});
+          if (!isMobile && dashboardTab === 'planning') {
+            loadPlanning().catch(() => {});
+          }
         }}
       />
     </div>
