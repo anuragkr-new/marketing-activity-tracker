@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { formatUS, isDateInWeekRange, formatUSDateTime } from '../utils/dates.js';
+import React, { useCallback, useMemo, useState } from 'react';
+import { formatUS, isDateInWeekRange } from '../utils/dates.js';
 import ActivityCellInput from './ActivityCellInput.jsx';
 
 function activityKey(initiativeId, weekId) {
@@ -26,7 +26,22 @@ export default function ActivityGridTable({
   onCellSave,
   busyKey,
 }) {
-  const [tip, setTip] = useState(null);
+  const [fillDraft, setFillDraft] = useState(() => new Map());
+  const reportFill = useCallback((iniId, wId, filled) => {
+    const k = activityKey(iniId, wId);
+    setFillDraft((prev) => {
+      if (filled) {
+        if (prev.get(k)) return prev;
+        const next = new Map(prev);
+        next.set(k, true);
+        return next;
+      }
+      if (!prev.has(k)) return prev;
+      const next = new Map(prev);
+      next.delete(k);
+      return next;
+    });
+  }, []);
   const groups = useMemo(() => groupInitiatives(initiatives), [initiatives]);
 
   if (!weeks.length) {
@@ -143,7 +158,9 @@ export default function ActivityGridTable({
                       const key = activityKey(ini.id, w.id);
                       const cell = activityByKey.get(key);
                       const loading = busyKey === key;
-                      const hasText = Boolean((cell?.cell_text || '').trim());
+                      const hasText =
+                        Boolean((cell?.cell_text || '').trim()) ||
+                        fillDraft.get(key) === true;
                       return (
                         <td
                           key={w.id}
@@ -156,27 +173,6 @@ export default function ActivityGridTable({
                             position: 'relative',
                             padding: '4px 6px',
                           }}
-                          onMouseEnter={(e) => {
-                            if (!cell?.updated_at) return;
-                            setTip({
-                              x: e.clientX,
-                              y: e.clientY,
-                              text: `Last updated · ${formatUSDateTime(cell.updated_at)}`,
-                            });
-                          }}
-                          onMouseMove={(e) => {
-                            if (!cell?.updated_at) return;
-                            setTip((t) =>
-                              t
-                                ? {
-                                    ...t,
-                                    x: e.clientX,
-                                    y: e.clientY,
-                                  }
-                                : t
-                            );
-                          }}
-                          onMouseLeave={() => setTip(null)}
                         >
                           <ActivityCellInput
                             initiativeId={ini.id}
@@ -185,6 +181,8 @@ export default function ActivityGridTable({
                             disabled={completed}
                             busy={loading}
                             onSave={onCellSave}
+                            onFillHint={reportFill}
+                            inputStyle={{ background: 'transparent' }}
                           />
                         </td>
                       );
@@ -196,24 +194,6 @@ export default function ActivityGridTable({
           ))}
         </tbody>
       </table>
-      {tip ? (
-        <div
-          style={{
-            position: 'fixed',
-            left: tip.x + 12,
-            top: (tip.y || 0) + 12,
-            zIndex: 50,
-            fontSize: 11,
-            background: 'var(--surface)',
-            border: '1px solid var(--rule)',
-            padding: '6px 10px',
-            pointerEvents: 'none',
-            maxWidth: 280,
-          }}
-        >
-          {tip.text}
-        </div>
-      ) : null}
       <div
         style={{
           display: 'flex',

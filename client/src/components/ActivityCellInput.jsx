@@ -11,6 +11,8 @@ export default function ActivityCellInput({
   busy,
   onSave,
   inputStyle,
+  /** When set, notifies whether the field has non-whitespace text (for row tint); cleared on unmount. */
+  onFillHint,
 }) {
   const serverText = cell?.cell_text ?? '';
   const [value, setValue] = useState(serverText);
@@ -18,6 +20,18 @@ export default function ActivityCellInput({
   useEffect(() => {
     setValue(serverText);
   }, [serverText, cell?.updated_at, initiativeId, weekId]);
+
+  useEffect(() => {
+    if (!onFillHint) return;
+    onFillHint(initiativeId, weekId, value.trim().length > 0);
+  }, [value, initiativeId, weekId, onFillHint]);
+
+  useEffect(() => {
+    if (!onFillHint) return undefined;
+    return () => {
+      onFillHint(initiativeId, weekId, false);
+    };
+  }, [initiativeId, weekId, onFillHint]);
 
   return (
     <input
